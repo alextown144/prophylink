@@ -1,21 +1,333 @@
-import { CalendarDays, ClipboardList, MessageCircle, ShieldCheck } from "lucide-react";
+import {
+  ArrowRight,
+  BadgeCheck,
+  CalendarDays,
+  MapPin,
+  ShieldCheck,
+  SlidersHorizontal,
+  UserRound
+} from "lucide-react";
+import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { DashboardShell } from "@/components/dashboard/dashboard-shell";
-import { MetricCard } from "@/components/dashboard/metric-card";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
+type AccountRole = {
+  kind: "professional" | "office" | "admin";
+  onboarding_completed_at: string | null;
+};
+
+type UserProfile = {
+  first_name: string | null;
+  last_name: string | null;
+  display_name: string | null;
+  email: string;
+  city: string | null;
+  state: string | null;
+  postal_code: string | null;
+};
+
+type ProfessionalProfile = {
+  professional_role_id: string;
+  short_bio: string | null;
+  years_experience: number | string | null;
+  hourly_rate_cents: number | null;
+  preferred_radius_miles: number | string | null;
+};
+
+type ProfessionalRole = {
+  id: string;
+  name: string;
+  slug: string;
+};
 
 export default async function ProfessionalDashboardPage() {
-  await requireUser();
+  const user = await requireUser();
+  const { accountRoles, profile, professionalProfile, professionalRole } =
+    await getProfessionalDashboardData(user.id);
+  const isAdmin = accountRoles.some((role) => role.kind === "admin");
+  const professionalRoleRecord = accountRoles.find((role) => role.kind === "professional");
+  const displayName = profile?.display_name || user.email || "there";
+  const onboardingComplete = Boolean(professionalRoleRecord?.onboarding_completed_at);
 
   return (
-    <DashboardShell
-      eyebrow="Professional dashboard"
-      title="Good afternoon, Sarah"
-      description="A placeholder shell for availability, nearby shifts, coverage requests, messages, and credential status."
-    >
-      <MetricCard icon={CalendarDays} label="Available days" value="7" />
-      <MetricCard icon={ClipboardList} label="Nearby open shifts" value="3" />
-      <MetricCard icon={ShieldCheck} label="Credentials pending" value="1" />
-      <MetricCard icon={MessageCircle} label="Unread messages" value="0" />
-    </DashboardShell>
+    <main className="container py-10">
+      <div className="mb-8 flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
+        <div className="max-w-3xl">
+          <p className="text-sm font-semibold uppercase tracking-normal text-teal-700">
+            Professional dashboard
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold text-slate-950 sm:text-4xl">
+            Welcome back, {firstName(displayName)}
+          </h1>
+          <p className="mt-3 leading-7 text-slate-600">
+            Your beta profile foundation is connected to Supabase. Use this page
+            to review what offices will eventually see and jump into the next
+            setup tasks.
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/professional/profile">Edit profile</Link>
+          </Button>
+          {isAdmin ? (
+            <Button asChild variant="outline">
+              <Link href="/admin">Admin</Link>
+            </Button>
+          ) : null}
+        </div>
+      </div>
+
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <StatusMetric
+          icon={<BadgeCheck className="h-5 w-5" />}
+          label="Profile status"
+          value={onboardingComplete ? "Complete" : "Needs setup"}
+        />
+        <StatusMetric
+          icon={<UserRound className="h-5 w-5" />}
+          label="Role"
+          value={professionalRole?.name ?? "Not selected"}
+        />
+        <StatusMetric
+          icon={<SlidersHorizontal className="h-5 w-5" />}
+          label="Rate"
+          value={formatRate(professionalProfile?.hourly_rate_cents)}
+        />
+        <StatusMetric
+          icon={<MapPin className="h-5 w-5" />}
+          label="Service area"
+          value={formatRadius(professionalProfile?.preferred_radius_miles)}
+        />
+      </section>
+
+      <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Marketplace profile preview</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-5">
+            <div>
+              <p className="text-sm font-semibold text-slate-500">Name</p>
+              <p className="mt-1 text-lg font-semibold text-slate-950">
+                {profile?.display_name || "Add your name"}
+              </p>
+            </div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <ProfileFact label="Email" value={profile?.email} />
+              <ProfileFact
+                label="Location"
+                value={formatLocation(profile?.city, profile?.state, profile?.postal_code)}
+              />
+              <ProfileFact label="Experience" value={formatYears(professionalProfile?.years_experience)} />
+              <ProfileFact label="Launch role" value={professionalRole?.name} />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-slate-500">Short bio</p>
+              <p className="mt-2 rounded-lg bg-slate-50 p-4 leading-7 text-slate-700">
+                {professionalProfile?.short_bio || "No bio saved yet."}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ShieldCheck className="h-5 w-5 text-teal-700" />
+              Beta readiness
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            <ChecklistItem complete={Boolean(profile?.display_name)} label="Name saved" />
+            <ChecklistItem complete={Boolean(professionalRole)} label="Professional role selected" />
+            <ChecklistItem complete={Boolean(profile?.city && profile.state)} label="Location saved" />
+            <ChecklistItem complete={Boolean(professionalProfile)} label="Profile foundation saved" />
+            <NextStep
+              href="/professional/profile"
+              label="Update profile foundation"
+              text="Change your public-safe bio, rate, radius, or location."
+            />
+            <NextStep
+              href="/admin/users"
+              label="Create another test invite"
+              text="As admin, invite a clean professional test user for non-admin testing."
+              show={isAdmin}
+            />
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="mt-6 grid gap-4 md:grid-cols-3">
+        <FutureCard
+          icon={<CalendarDays className="h-5 w-5" />}
+          title="Availability"
+          text="Next milestone will let professionals set available and unavailable dates."
+        />
+        <FutureCard
+          icon={<ShieldCheck className="h-5 w-5" />}
+          title="Credentials"
+          text="Credential uploads and review remain intentionally deferred."
+        />
+        <FutureCard
+          icon={<ArrowRight className="h-5 w-5" />}
+          title="Shift matching"
+          text="Marketplace matching will build on this saved profile foundation."
+        />
+      </section>
+    </main>
   );
+}
+
+async function getProfessionalDashboardData(userId: string) {
+  const supabase = await createSupabaseServerClient();
+  const [profileResult, rolesResult, professionalProfileResult] = await Promise.all([
+    supabase
+      .from("user_profiles")
+      .select("first_name, last_name, display_name, email, city, state, postal_code")
+      .eq("id", userId)
+      .maybeSingle(),
+    supabase
+      .from("account_roles")
+      .select("kind, onboarding_completed_at")
+      .eq("user_id", userId),
+    supabase
+      .from("professional_profiles")
+      .select(
+        "professional_role_id, short_bio, years_experience, hourly_rate_cents, preferred_radius_miles"
+      )
+      .eq("user_id", userId)
+      .maybeSingle()
+  ]);
+  const professionalProfile = professionalProfileResult.data as ProfessionalProfile | null;
+  let professionalRole: ProfessionalRole | null = null;
+
+  if (professionalProfile?.professional_role_id) {
+    const { data } = await supabase
+      .from("professional_roles")
+      .select("id, name, slug")
+      .eq("id", professionalProfile.professional_role_id)
+      .maybeSingle();
+    professionalRole = data as ProfessionalRole | null;
+  }
+
+  return {
+    accountRoles: (rolesResult.data ?? []) as AccountRole[],
+    profile: profileResult.data as UserProfile | null,
+    professionalProfile,
+    professionalRole
+  };
+}
+
+function StatusMetric({
+  icon,
+  label,
+  value
+}: {
+  icon: React.ReactNode;
+  label: string;
+  value: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex min-h-32 flex-col justify-between p-5">
+        <div className="text-teal-700">{icon}</div>
+        <div>
+          <p className="text-2xl font-semibold text-slate-950">{value}</p>
+          <p className="mt-1 text-sm text-slate-600">{label}</p>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ProfileFact({ label, value }: { label: string; value?: string | null }) {
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <p className="text-sm font-semibold text-slate-500">{label}</p>
+      <p className="mt-1 font-semibold text-slate-950">{value || "Not saved"}</p>
+    </div>
+  );
+}
+
+function ChecklistItem({ complete, label }: { complete: boolean; label: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
+      <span className="text-sm text-slate-700">{label}</span>
+      <Badge variant={complete ? "default" : "outline"}>{complete ? "Done" : "Needed"}</Badge>
+    </div>
+  );
+}
+
+function NextStep({
+  href,
+  label,
+  show = true,
+  text
+}: {
+  href: string;
+  label: string;
+  show?: boolean;
+  text: string;
+}) {
+  if (!show) {
+    return null;
+  }
+
+  return (
+    <Link
+      className="focus-ring group rounded-lg border bg-white p-4 transition-colors hover:border-teal-300 hover:bg-teal-50"
+      href={href}
+    >
+      <span className="flex items-center justify-between gap-3 font-semibold text-slate-950">
+        {label}
+        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+      </span>
+      <span className="mt-2 block text-sm leading-6 text-slate-600">{text}</span>
+    </Link>
+  );
+}
+
+function FutureCard({
+  icon,
+  text,
+  title
+}: {
+  icon: React.ReactNode;
+  text: string;
+  title: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="p-5">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-teal-50 text-teal-700">
+          {icon}
+        </div>
+        <h3 className="mt-4 font-semibold text-slate-950">{title}</h3>
+        <p className="mt-2 text-sm leading-6 text-slate-600">{text}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function firstName(value: string) {
+  return value.split(" ")[0] || value;
+}
+
+function formatRate(cents?: number | null) {
+  return typeof cents === "number" ? `$${Math.round(cents / 100)}/hr` : "Not set";
+}
+
+function formatRadius(value?: number | string | null) {
+  return value ? `${value} mi` : "Not set";
+}
+
+function formatYears(value?: number | string | null) {
+  return value ? `${value} years` : "Not saved";
+}
+
+function formatLocation(city?: string | null, state?: string | null, postalCode?: string | null) {
+  return [city, state, postalCode].filter(Boolean).join(", ") || "Not saved";
 }
