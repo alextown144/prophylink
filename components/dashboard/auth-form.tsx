@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { signUpWithAccount } from "@/app/auth/actions";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isInviteOnlySignup, isSupabaseConfigured } from "@/lib/config/env";
@@ -14,7 +15,13 @@ type AuthFormProps = {
   mode: "login" | "signup";
 };
 
+type AccountRole = {
+  kind: "professional" | "office" | "admin";
+  onboarding_completed_at: string | null;
+};
+
 export function AuthForm({ mode }: AuthFormProps) {
+  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [inviteCode, setInviteCode] = useState("");
@@ -44,14 +51,27 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       setMessage(result.message);
       setLoading(false);
+      if (result.ok) {
+        router.refresh();
+        router.push("/onboarding");
+      }
       return;
     }
 
     const supabase = createSupabaseBrowserClient();
     const result = await supabase.auth.signInWithPassword({ email, password });
 
-    setMessage(result.error ? result.error.message : "Signed in.");
+    if (result.error) {
+      setMessage(result.error.message);
+      setLoading(false);
+      return;
+    }
+
+    setMessage("Signed in. Redirecting...");
+    const nextPath = await getPostLoginPath(supabase);
     setLoading(false);
+    router.refresh();
+    router.push(nextPath);
   }
 
   return (
@@ -132,4 +152,29 @@ export function AuthForm({ mode }: AuthFormProps) {
       </CardContent>
     </Card>
   );
+}
+
+async function getPostLoginPath(supabase: ReturnType<typeof createSupabaseBrowserClient>) {
+  const { data } = await supabase
+    .from("account_roles")
+    .select("kind, onboarding_completed_at");
+  const roles = data as AccountRole[] | null;
+
+  if (roles?.some((role) => role.kind === "admin")) {
+    return "/admin";
+  }
+
+  const professionalRole = roles?.find((role) => role.kind === "professional");
+  if (professionalRole) {
+    return professionalRole.onboarding_completed_at
+      ? "/professional/dashboard"
+      : "/onboarding/professional";
+  }
+
+  const officeRole = roles?.find((role) => role.kind === "office");
+  if (officeRole) {
+    return officeRole.onboarding_completed_at ? "/office/dashboard" : "/onboarding/office";
+  }
+
+  return "/onboarding";
 }
