@@ -165,6 +165,68 @@ export type Database = {
         name: string;
         enabled: boolean;
       }>;
+      shifts: Table<
+        {
+          id: string;
+          organization_id: string;
+          office_location_id: string;
+          professional_role_id: string;
+          created_by: string | null;
+          status: Database["public"]["Enums"]["shift_status"];
+          starts_at: string;
+          ends_at: string;
+          timezone: string;
+          hourly_rate_cents: number | null;
+          unpaid_lunch_minutes: number | null;
+          description: string | null;
+          required_notes: string | null;
+          dress_requirements: string | null;
+          parking_instructions: string | null;
+          arrival_instructions: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          organization_id: string;
+          office_location_id: string;
+          professional_role_id: string;
+          created_by?: string | null;
+          status?: Database["public"]["Enums"]["shift_status"];
+          starts_at: string;
+          ends_at: string;
+          timezone?: string;
+          hourly_rate_cents?: number | null;
+          unpaid_lunch_minutes?: number | null;
+          description?: string | null;
+          required_notes?: string | null;
+          dress_requirements?: string | null;
+          parking_instructions?: string | null;
+          arrival_instructions?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        },
+        {
+          id?: string;
+          organization_id?: string;
+          office_location_id?: string;
+          professional_role_id?: string;
+          created_by?: string | null;
+          status?: Database["public"]["Enums"]["shift_status"];
+          starts_at?: string;
+          ends_at?: string;
+          timezone?: string;
+          hourly_rate_cents?: number | null;
+          unpaid_lunch_minutes?: number | null;
+          description?: string | null;
+          required_notes?: string | null;
+          dress_requirements?: string | null;
+          parking_instructions?: string | null;
+          arrival_instructions?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+      >;
       signup_invitations: Table<
         {
           id: string;

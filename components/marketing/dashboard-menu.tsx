@@ -156,6 +156,7 @@ function buildDashboardLinks(roles: AccountKind[]): DashboardLink[] {
   if (uniqueRoles.has("office")) {
     links.push(
       { href: "/office/dashboard", label: "Office dashboard", section: "Office" },
+      { href: "/office/shifts/new", label: "Post a shift", section: "Office" },
       { href: "/office/profile", label: "Office profile", section: "Office" },
       { href: "/office/locations", label: "Office locations", section: "Office" }
     );

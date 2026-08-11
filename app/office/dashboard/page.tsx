@@ -2,6 +2,7 @@ import {
   ArrowRight,
   Building2,
   CalendarCheck,
+  CalendarPlus,
   ClipboardList,
   MapPin,
   Search,
@@ -45,12 +46,31 @@ type Location = {
   software_used: string[];
 };
 
+type PostedShift = {
+  id: string;
+  status: "draft" | "open" | "pending" | "filled" | "completed" | "cancelled";
+  starts_at: string;
+  ends_at: string;
+  hourly_rate_cents: number | null;
+  office_locations: {
+    name: string | null;
+    city: string;
+    state: string;
+  } | null;
+  professional_roles: {
+    name: string;
+  } | null;
+};
+
 export default async function OfficeDashboardPage() {
   const user = await requireUser();
-  const { accountRoles, locations, organization } = await getOfficeDashboardData(user.id);
+  const { accountRoles, locations, organization, shifts } = await getOfficeDashboardData(
+    user.id
+  );
   const isAdmin = accountRoles.some((role) => role.kind === "admin");
   const officeRole = accountRoles.find((role) => role.kind === "office");
   const onboardingComplete = Boolean(officeRole?.onboarding_completed_at);
+  const openShiftCount = shifts.filter((shift) => shift.status === "open").length;
 
   return (
     <main className="container py-10">
@@ -68,6 +88,12 @@ export default async function OfficeDashboardPage() {
           </p>
         </div>
         <div className="flex flex-wrap gap-3">
+          <Button asChild>
+            <Link href="/office/shifts/new">
+              <CalendarPlus className="h-4 w-4" />
+              Post a shift
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/office/profile">
               {organization ? "Edit office profile" : "Finish setup"}
@@ -102,8 +128,8 @@ export default async function OfficeDashboardPage() {
         />
         <StatusMetric
           icon={<CalendarCheck className="h-5 w-5" />}
-          label="Shift posting"
-          value="Next"
+          label="Open shifts"
+          value={String(openShiftCount)}
         />
       </section>
 
@@ -183,22 +209,47 @@ export default async function OfficeDashboardPage() {
         </Card>
       </section>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
-        <FutureCard
-          icon={<ClipboardList className="h-5 w-5" />}
-          title="Post shifts"
-          text="Shift creation will build on the saved organization and location records."
-        />
-        <FutureCard
-          icon={<Search className="h-5 w-5" />}
-          title="Search professionals"
-          text="Professional discovery will use verified profiles and plan gates."
-        />
-        <FutureCard
-          icon={<ArrowRight className="h-5 w-5" />}
-          title="Coverage exchange"
-          text="Office approval is intentionally out of the professional-to-professional MVP."
-        />
+      <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle>Posted shifts</CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {shifts.length > 0 ? (
+              shifts.map((shift) => <PostedShiftRow key={shift.id} shift={shift} />)
+            ) : (
+              <div className="rounded-lg bg-slate-50 p-5">
+                <p className="font-semibold text-slate-950">No shifts posted yet</p>
+                <p className="mt-2 leading-7 text-slate-600">
+                  Create your first open shift for dental professionals to review.
+                </p>
+                <Button asChild className="mt-4">
+                  <Link href="/office/shifts/new">
+                    <CalendarPlus className="h-4 w-4" />
+                    Post a shift
+                  </Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+        <div className="grid gap-4">
+          <FutureCard
+            icon={<ClipboardList className="h-5 w-5" />}
+            title="Shift workflow"
+            text="Next milestones will add candidate matching, booking requests, and office-side confirmations."
+          />
+          <FutureCard
+            icon={<Search className="h-5 w-5" />}
+            title="Search professionals"
+            text="Professional discovery will use verified profiles and plan gates."
+          />
+          <FutureCard
+            icon={<ArrowRight className="h-5 w-5" />}
+            title="Coverage exchange"
+            text="Office approval is intentionally out of the professional-to-professional MVP."
+          />
+        </div>
       </section>
     </main>
   );
@@ -225,11 +276,12 @@ async function getOfficeDashboardData(userId: string) {
     return {
       accountRoles: (rolesResult.data ?? []) as AccountRole[],
       locations: [] as Location[],
-      organization: null as Organization | null
+      organization: null as Organization | null,
+      shifts: [] as PostedShift[]
     };
   }
 
-  const [organizationResult, locationsResult] = await Promise.all([
+  const [organizationResult, locationsResult, shiftsResult] = await Promise.all([
     supabase
       .from("organizations")
       .select("id, name, primary_email, primary_phone, website")
@@ -241,13 +293,22 @@ async function getOfficeDashboardData(userId: string) {
         "id, name, address_line1, city, state, postal_code, phone, contact_name, contact_email, software_used"
       )
       .eq("organization_id", organizationId)
-      .order("name", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("shifts")
+      .select(
+        "id, status, starts_at, ends_at, hourly_rate_cents, office_locations(name, city, state), professional_roles(name)"
+      )
+      .eq("organization_id", organizationId)
+      .order("starts_at", { ascending: true })
+      .limit(6)
   ]);
 
   return {
     accountRoles: (rolesResult.data ?? []) as AccountRole[],
     locations: (locationsResult.data ?? []) as Location[],
-    organization: organizationResult.data as Organization | null
+    organization: organizationResult.data as Organization | null,
+    shifts: (shiftsResult.data ?? []) as PostedShift[]
   };
 }
 
@@ -287,6 +348,35 @@ function ChecklistItem({ complete, label }: { complete: boolean; label: string }
     <div className="flex items-center justify-between gap-3 rounded-lg bg-slate-50 px-3 py-2">
       <span className="text-sm text-slate-700">{label}</span>
       <Badge variant={complete ? "default" : "outline"}>{complete ? "Done" : "Needed"}</Badge>
+    </div>
+  );
+}
+
+function PostedShiftRow({ shift }: { shift: PostedShift }) {
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+        <div>
+          <p className="font-semibold text-slate-950">
+            {shift.professional_roles?.name ?? "Professional shift"}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {formatShiftWindow(shift.starts_at, shift.ends_at)}
+          </p>
+          <p className="mt-1 text-sm text-slate-600">
+            {shift.office_locations?.name ?? "Office location"} -{" "}
+            {shift.office_locations?.city}, {shift.office_locations?.state}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+          <Badge variant={shift.status === "open" ? "default" : "outline"}>
+            {formatStatus(shift.status)}
+          </Badge>
+          <span className="text-sm font-semibold text-teal-700">
+            {formatRate(shift.hourly_rate_cents)}
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -340,4 +430,36 @@ function FutureCard({
       </CardContent>
     </Card>
   );
+}
+
+function formatShiftWindow(startsAt: string, endsAt: string) {
+  const start = new Date(startsAt);
+  const end = new Date(endsAt);
+  const day = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: "America/Los_Angeles"
+  }).format(start);
+  const startTime = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles"
+  }).format(start);
+  const endTime = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles"
+  }).format(end);
+
+  return `${day}, ${startTime} - ${endTime}`;
+}
+
+function formatRate(rateCents: number | null) {
+  return rateCents ? `$${Math.round(rateCents / 100)}/hr` : "Rate TBD";
+}
+
+function formatStatus(status: PostedShift["status"]) {
+  return status
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
