@@ -2,12 +2,16 @@ import {
   ArrowRight,
   BadgeCheck,
   CalendarDays,
-  MapPin,
   ShieldCheck,
   SlidersHorizontal,
   UserRound
 } from "lucide-react";
 import Link from "next/link";
+import {
+  formatAvailabilityDate,
+  formatTimeRange,
+  parseWeeklyRecurrenceDays
+} from "@/lib/availability";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
@@ -30,11 +34,23 @@ type UserProfile = {
 };
 
 type ProfessionalProfile = {
+  id: string;
   professional_role_id: string;
   short_bio: string | null;
   years_experience: number | string | null;
   hourly_rate_cents: number | null;
   preferred_radius_miles: number | string | null;
+};
+
+type AvailabilityRule = {
+  id: string;
+  kind: "available" | "unavailable";
+  starts_at: string | null;
+  ends_at: string | null;
+  recurrence_rule: string | null;
+  recurrence_starts_on: string | null;
+  recurrence_ends_on: string | null;
+  notes: string | null;
 };
 
 type ProfessionalRole = {
@@ -45,7 +61,7 @@ type ProfessionalRole = {
 
 export default async function ProfessionalDashboardPage() {
   const user = await requireUser();
-  const { accountRoles, profile, professionalProfile, professionalRole } =
+  const { accountRoles, availabilityRules, profile, professionalProfile, professionalRole } =
     await getProfessionalDashboardData(user.id);
   const isAdmin = accountRoles.some((role) => role.kind === "admin");
   const professionalRoleRecord = accountRoles.find((role) => role.kind === "professional");
@@ -70,6 +86,9 @@ export default async function ProfessionalDashboardPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild>
+            <Link href="/professional/availability">Manage availability</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href="/professional/profile">Edit profile</Link>
           </Button>
           {isAdmin ? (
@@ -97,9 +116,9 @@ export default async function ProfessionalDashboardPage() {
           value={formatRate(professionalProfile?.hourly_rate_cents)}
         />
         <StatusMetric
-          icon={<MapPin className="h-5 w-5" />}
-          label="Service area"
-          value={formatRadius(professionalProfile?.preferred_radius_miles)}
+          icon={<CalendarDays className="h-5 w-5" />}
+          label="Availability rules"
+          value={String(availabilityRules.length)}
         />
       </section>
 
@@ -145,6 +164,12 @@ export default async function ProfessionalDashboardPage() {
             <ChecklistItem complete={Boolean(professionalRole)} label="Professional role selected" />
             <ChecklistItem complete={Boolean(profile?.city && profile.state)} label="Location saved" />
             <ChecklistItem complete={Boolean(professionalProfile)} label="Profile foundation saved" />
+            <ChecklistItem complete={availabilityRules.length > 0} label="Availability saved" />
+            <NextStep
+              href="/professional/availability"
+              label="Manage availability calendar"
+              text="Add individual dates or weekly repeating availability."
+            />
             <NextStep
               href="/professional/profile"
               label="Update profile foundation"
@@ -160,12 +185,34 @@ export default async function ProfessionalDashboardPage() {
         </Card>
       </section>
 
-      <section className="mt-6 grid gap-4 md:grid-cols-3">
-        <FutureCard
-          icon={<CalendarDays className="h-5 w-5" />}
-          title="Availability"
-          text="Next milestone will let professionals set available and unavailable dates."
-        />
+      <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-teal-700" />
+              Availability preview
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {availabilityRules.length > 0 ? (
+              availabilityRules.slice(0, 4).map((rule) => (
+                <AvailabilityPreview key={rule.id} rule={rule} />
+              ))
+            ) : (
+              <div className="rounded-lg bg-slate-50 p-4">
+                <p className="font-semibold text-slate-950">No availability yet</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Add a single date or repeating weekly rule so future matching can
+                  find you for the right shifts.
+                </p>
+                <Button asChild className="mt-4">
+                  <Link href="/professional/availability">Add availability</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <FutureCard
           icon={<ShieldCheck className="h-5 w-5" />}
           title="Credentials"
@@ -196,7 +243,7 @@ async function getProfessionalDashboardData(userId: string) {
     supabase
       .from("professional_profiles")
       .select(
-        "professional_role_id, short_bio, years_experience, hourly_rate_cents, preferred_radius_miles"
+        "id, professional_role_id, short_bio, years_experience, hourly_rate_cents, preferred_radius_miles"
       )
       .eq("user_id", userId)
       .maybeSingle()
@@ -213,12 +260,51 @@ async function getProfessionalDashboardData(userId: string) {
     professionalRole = data as ProfessionalRole | null;
   }
 
+  let availabilityRules: AvailabilityRule[] = [];
+
+  if (professionalProfile?.id) {
+    const { data } = await supabase
+      .from("availability_rules")
+      .select(
+        "id, kind, starts_at, ends_at, recurrence_rule, recurrence_starts_on, recurrence_ends_on, notes"
+      )
+      .eq("professional_profile_id", professionalProfile.id)
+      .order("created_at", { ascending: false })
+      .limit(6);
+    availabilityRules = (data ?? []) as AvailabilityRule[];
+  }
+
   return {
     accountRoles: (rolesResult.data ?? []) as AccountRole[],
+    availabilityRules,
     profile: profileResult.data as UserProfile | null,
     professionalProfile,
     professionalRole
   };
+}
+
+function AvailabilityPreview({ rule }: { rule: AvailabilityRule }) {
+  const recurringDays = parseWeeklyRecurrenceDays(rule.recurrence_rule);
+  const isRecurring = recurringDays.length > 0;
+
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-semibold text-slate-950">
+          {isRecurring
+            ? `Every ${recurringDays.join(", ")}`
+            : formatAvailabilityDate(rule.starts_at)}
+        </p>
+        <Badge variant={rule.kind === "available" ? "default" : "secondary"}>
+          {rule.kind}
+        </Badge>
+      </div>
+      <p className="mt-2 text-sm text-slate-600">
+        {formatTimeRange(rule.starts_at, rule.ends_at)}
+      </p>
+      {rule.notes ? <p className="mt-2 text-sm text-slate-600">{rule.notes}</p> : null}
+    </div>
+  );
 }
 
 function StatusMetric({
@@ -318,10 +404,6 @@ function firstName(value: string) {
 
 function formatRate(cents?: number | null) {
   return typeof cents === "number" ? `$${Math.round(cents / 100)}/hr` : "Not set";
-}
-
-function formatRadius(value?: number | string | null) {
-  return value ? `${value} mi` : "Not set";
 }
 
 function formatYears(value?: number | string | null) {

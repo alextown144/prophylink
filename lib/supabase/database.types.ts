@@ -32,6 +32,53 @@ export type Database = {
           created_at?: string;
         }
       >;
+      availability_rules: Table<
+        {
+          id: string;
+          professional_profile_id: string;
+          kind: Database["public"]["Enums"]["availability_kind"];
+          starts_at: string | null;
+          ends_at: string | null;
+          all_day: boolean;
+          recurrence_rule: string | null;
+          recurrence_starts_on: string | null;
+          recurrence_ends_on: string | null;
+          timezone: string;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          professional_profile_id: string;
+          kind?: Database["public"]["Enums"]["availability_kind"];
+          starts_at?: string | null;
+          ends_at?: string | null;
+          all_day?: boolean;
+          recurrence_rule?: string | null;
+          recurrence_starts_on?: string | null;
+          recurrence_ends_on?: string | null;
+          timezone?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        },
+        {
+          id?: string;
+          professional_profile_id?: string;
+          kind?: Database["public"]["Enums"]["availability_kind"];
+          starts_at?: string | null;
+          ends_at?: string | null;
+          all_day?: boolean;
+          recurrence_rule?: string | null;
+          recurrence_starts_on?: string | null;
+          recurrence_ends_on?: string | null;
+          timezone?: string;
+          notes?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+      >;
       office_locations: Table<
         {
           id: string;
