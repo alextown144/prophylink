@@ -53,10 +53,12 @@ const config: Config = {
         sm: "calc(var(--radius) - 4px)"
       },
       fontFamily: {
-        sans: ["Inter", "ui-sans-serif", "system-ui", "sans-serif"]
+        sans: ["var(--font-inter)", "Inter", "ui-sans-serif", "system-ui", "sans-serif"],
+        heading: ["var(--font-poppins)", "Poppins", "ui-sans-serif", "system-ui", "sans-serif"]
       },
       boxShadow: {
-        soft: "0 24px 80px -44px rgba(8, 47, 73, 0.35)"
+        soft: "0 24px 80px -44px rgba(8, 47, 73, 0.35)",
+        brand: "0 24px 80px -38px rgba(13, 19, 43, 0.45)"
       }
     }
   },

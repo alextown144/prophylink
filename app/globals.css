@@ -3,25 +3,25 @@
 @tailwind utilities;
 
 :root {
-  --background: 190 33% 98%;
-  --foreground: 205 54% 16%;
+  --background: 180 33% 98%;
+  --foreground: 229 59% 11%;
   --card: 0 0% 100%;
-  --card-foreground: 205 54% 16%;
+  --card-foreground: 229 59% 11%;
   --popover: 0 0% 100%;
-  --popover-foreground: 205 54% 16%;
-  --primary: 190 87% 28%;
+  --popover-foreground: 229 59% 11%;
+  --primary: 176 100% 35%;
   --primary-foreground: 0 0% 100%;
-  --secondary: 198 38% 93%;
-  --secondary-foreground: 205 54% 16%;
-  --muted: 200 24% 92%;
-  --muted-foreground: 202 20% 38%;
-  --accent: 168 62% 42%;
+  --secondary: 267 70% 95%;
+  --secondary-foreground: 263 74% 50%;
+  --muted: 216 33% 95%;
+  --muted-foreground: 218 19% 39%;
+  --accent: 263 74% 50%;
   --accent-foreground: 0 0% 100%;
   --destructive: 0 72% 51%;
   --destructive-foreground: 0 0% 100%;
-  --border: 198 28% 84%;
-  --input: 198 28% 84%;
-  --ring: 190 87% 28%;
+  --border: 214 32% 91%;
+  --input: 214 32% 91%;
+  --ring: 176 100% 35%;
   --radius: 0.5rem;
 }
 
@@ -31,9 +31,18 @@
 
 body {
   background:
-    radial-gradient(circle at 20% 0%, rgba(20, 184, 166, 0.12), transparent 24rem),
-    linear-gradient(180deg, #f7fbfb 0%, #eef7f6 50%, #ffffff 100%);
+    radial-gradient(circle at 12% 8%, rgba(0, 179, 164, 0.12), transparent 23rem),
+    linear-gradient(180deg, #ffffff 0%, #f8fafc 46%, #ffffff 100%);
   color: hsl(var(--foreground));
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-poppins), Poppins, ui-sans-serif, system-ui, sans-serif;
 }
 
 a {
