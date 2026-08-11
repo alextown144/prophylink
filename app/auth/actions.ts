@@ -11,6 +11,7 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 export type AuthActionResult = {
   ok: boolean;
   message: string;
+  requiresEmailConfirmation?: boolean;
 };
 
 export async function signUpWithAccount(
@@ -86,7 +87,7 @@ export async function signUpWithAccount(
     email,
     password,
     options: {
-      emailRedirectTo: `${getAppBaseUrl()}/login?confirmed=1`,
+      emailRedirectTo: `${getAppBaseUrl()}/auth/callback?next=/onboarding`,
       data: {
         account_kind: accountKind,
         signup_invitation_id: signupInvitationId
@@ -117,7 +118,7 @@ export async function signUpWithAccount(
     { onConflict: "user_id,kind" }
   );
 
-  if (signupInvitationId) {
+  if (data.session && signupInvitationId) {
     await admin
       .from("signup_invitations")
       .update({
@@ -130,10 +131,18 @@ export async function signUpWithAccount(
 
   revalidatePath("/admin/users");
 
+  if (!data.session) {
+    return {
+      ok: true,
+      message:
+        "Account created. Check your email to verify it. The confirmation link will bring you back to onboarding.",
+      requiresEmailConfirmation: true
+    };
+  }
+
   return {
     ok: true,
-    message:
-      "Account created. Continue to onboarding after email confirmation if it is enabled."
+    message: "Account created. Continue to onboarding."
   };
 }
 

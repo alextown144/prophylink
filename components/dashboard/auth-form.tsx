@@ -51,7 +51,7 @@ export function AuthForm({ mode }: AuthFormProps) {
 
       setMessage(result.message);
       setLoading(false);
-      if (result.ok) {
+      if (result.ok && !result.requiresEmailConfirmation) {
         router.refresh();
         router.push("/onboarding");
       }
