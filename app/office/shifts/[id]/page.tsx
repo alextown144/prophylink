@@ -66,8 +66,10 @@ type ShiftBooking = {
   created_at: string;
   agreed_hourly_rate_cents: number | null;
   professional_profiles: {
+    hourly_rate_cents: number | null;
+    preferred_radius_miles: number | string | null;
     short_bio: string | null;
-    years_experience: number | null;
+    years_experience: number | string | null;
     user_profiles: {
       display_name: string | null;
       email: string;
@@ -205,7 +207,7 @@ async function getOfficeShiftDetail(userId: string, shiftId: string) {
     supabase
       .from("bookings")
       .select(
-        "id, status, created_at, agreed_hourly_rate_cents, professional_profiles(short_bio, years_experience, user_profiles(display_name, email, city, state), professional_roles(name))"
+        "id, status, created_at, agreed_hourly_rate_cents, professional_profiles(hourly_rate_cents, preferred_radius_miles, short_bio, years_experience, user_profiles(display_name, email, city, state), professional_roles(name))"
       )
       .eq("shift_id", shiftId)
       .eq("organization_id", organizationId)
@@ -228,6 +230,16 @@ function InterestedProfessionalCard({
   const profile = booking.professional_profiles;
   const userProfile = profile?.user_profiles;
   const canAccept = booking.status === "interested";
+  const displayName = userProfile?.display_name ?? "Professional";
+  const profileFacts = [
+    ["Role", profile?.professional_roles?.name],
+    ["Location", formatProfessionalLocation(userProfile?.city, userProfile?.state)],
+    ["Email", userProfile?.email],
+    ["Experience", formatYears(profile?.years_experience)],
+    ["Profile rate", formatRate(profile?.hourly_rate_cents)],
+    ["Shift response rate", formatRate(booking.agreed_hourly_rate_cents)],
+    ["Preferred radius", formatRadius(profile?.preferred_radius_miles)]
+  ].filter((fact): fact is [string, string] => Boolean(fact[1]));
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -235,23 +247,37 @@ function InterestedProfessionalCard({
         <div>
           <p className="flex items-center gap-2 font-semibold text-slate-950">
             <UserRound className="h-4 w-4 text-teal-700" />
-            {userProfile?.display_name ?? "Professional"}
+            {displayName}
           </p>
-          <p className="mt-1 text-sm text-slate-600">
-            {[profile?.professional_roles?.name, userProfile?.city, userProfile?.state]
-              .filter(Boolean)
-              .join(" - ")}
-          </p>
-          <p className="mt-1 text-sm font-semibold text-teal-700">
-            {formatRate(booking.agreed_hourly_rate_cents)}
-          </p>
+          {profile?.professional_roles?.name ? (
+            <p className="mt-1 text-sm font-semibold text-teal-700">
+              {profile.professional_roles.name}
+            </p>
+          ) : null}
         </div>
         <Badge variant={booking.status === "accepted" ? "default" : "outline"}>
           {formatStatus(booking.status)}
         </Badge>
       </div>
+      {profileFacts.length > 0 ? (
+        <dl className="mt-4 grid gap-3 rounded-lg bg-slate-50 p-3 text-sm sm:grid-cols-2">
+          {profileFacts.map(([label, value]) => (
+            <div key={label}>
+              <dt className="font-semibold text-slate-500">{label}</dt>
+              <dd className="mt-1 font-semibold text-slate-950">{value}</dd>
+            </div>
+          ))}
+        </dl>
+      ) : (
+        <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
+          Professional profile details are not available yet.
+        </p>
+      )}
       {profile?.short_bio ? (
-        <p className="mt-3 text-sm leading-6 text-slate-600">{profile.short_bio}</p>
+        <div className="mt-3">
+          <p className="text-sm font-semibold text-slate-500">Bio</p>
+          <p className="mt-1 text-sm leading-6 text-slate-600">{profile.short_bio}</p>
+        </div>
       ) : null}
       {canAccept ? (
         <form action={acceptInterestedProfessional} className="mt-4">
@@ -337,8 +363,20 @@ function formatAddress(shift: OfficeShiftDetail) {
   return `${location.name ?? "Office location"} - ${location.address_line1}, ${location.city}, ${location.state} ${location.postal_code}`;
 }
 
-function formatRate(rateCents: number | null) {
+function formatRate(rateCents?: number | null) {
   return rateCents ? `$${Math.round(rateCents / 100)}/hr` : "Rate TBD";
+}
+
+function formatProfessionalLocation(city?: string | null, state?: string | null) {
+  return [city, state].filter(Boolean).join(", ") || null;
+}
+
+function formatYears(value?: number | string | null) {
+  return value ? `${value} years` : null;
+}
+
+function formatRadius(value?: number | string | null) {
+  return value ? `${value} miles` : null;
 }
 
 function formatStatus(status: OfficeShiftDetail["status"] | ShiftBooking["status"]) {
