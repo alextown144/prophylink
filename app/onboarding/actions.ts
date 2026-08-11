@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -102,7 +103,7 @@ export async function saveProfessionalOnboarding(
   revalidatePath("/professional/profile");
   revalidatePath("/professional/dashboard");
 
-  return { ok: true, message: "Professional profile foundation saved." };
+  redirect("/professional/dashboard");
 }
 
 export async function saveOfficeOnboarding(
@@ -235,5 +236,5 @@ export async function saveOfficeOnboarding(
   revalidatePath("/office/locations");
   revalidatePath("/office/dashboard");
 
-  return { ok: true, message: "Office foundation saved." };
+  redirect("/office/dashboard");
 }
