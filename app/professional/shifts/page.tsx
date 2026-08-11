@@ -13,10 +13,11 @@ import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { expressInterestInShift } from "./actions";
+import { expressInterestInShift, respondToAcceptedShift } from "./actions";
 
 type SearchParams = Promise<{
   interest?: string;
+  response?: string;
 }>;
 
 type ProfessionalProfile = {
@@ -52,6 +53,7 @@ type OpenShift = {
 };
 
 type BookingInterest = {
+  id: string;
   shift_id: string | null;
   agreed_hourly_rate_cents?: number | null;
   agreed_starts_at?: string;
@@ -74,7 +76,7 @@ export default async function ProfessionalShiftsPage({
   searchParams: SearchParams;
 }) {
   const user = await requireUser();
-  const { interest } = await searchParams;
+  const { interest, response } = await searchParams;
   const { bookingsByShiftId, myBookings, openShifts, professionalProfile } = await getShiftBoardData(
     user.id
   );
@@ -105,6 +107,7 @@ export default async function ProfessionalShiftsPage({
       </div>
 
       {interest ? <InterestMessage status={interest} /> : null}
+      {response ? <ResponseMessage status={response} /> : null}
 
       {!professionalProfile ? (
         <Card>
@@ -132,7 +135,7 @@ export default async function ProfessionalShiftsPage({
                     {myBookings.map((booking) => (
                       <ResponseRow
                         booking={booking}
-                        key={`${booking.shift_id}-${booking.status}`}
+                        key={booking.id}
                       />
                     ))}
                   </div>
@@ -192,7 +195,9 @@ async function getShiftBoardData(userId: string) {
     professionalProfile
       ? supabase
           .from("bookings")
-          .select("shift_id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at")
+          .select(
+            "id, shift_id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at"
+          )
           .eq("professional_profile_id", professionalProfile.id)
           .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] })
@@ -238,6 +243,26 @@ function ResponseRow({ booking }: { booking: BookingInterest }) {
           {formatRate(booking.agreed_hourly_rate_cents ?? null)}
         </span>
       </div>
+      {booking.status === "accepted" && booking.shift_id ? (
+        <div className="mt-3 flex flex-wrap gap-2 sm:mt-0">
+          <form action={respondToAcceptedShift}>
+            <input name="booking_id" type="hidden" value={booking.id} />
+            <input name="shift_id" type="hidden" value={booking.shift_id} />
+            <input name="action" type="hidden" value="confirm" />
+            <Button size="sm" type="submit">
+              Confirm shift
+            </Button>
+          </form>
+          <form action={respondToAcceptedShift}>
+            <input name="booking_id" type="hidden" value={booking.id} />
+            <input name="shift_id" type="hidden" value={booking.shift_id} />
+            <input name="action" type="hidden" value="decline" />
+            <Button size="sm" type="submit" variant="outline">
+              Decline
+            </Button>
+          </form>
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -341,6 +366,24 @@ function InterestMessage({ status }: { status: string }) {
       {message}
     </p>
   );
+}
+
+function ResponseMessage({ status }: { status: string }) {
+  const message =
+    {
+      confirmed: "Shift confirmed. The office will see this as filled.",
+      declined: "Shift declined. The posting was reopened for the office.",
+      failed: "Shift response could not be saved. Try again.",
+      profile_required: "Complete your professional profile before responding.",
+      service_required: "Server configuration is required before confirming shifts.",
+      unavailable: "That accepted shift is no longer available."
+    }[status] ?? null;
+
+  return message ? (
+    <p className="mb-5 rounded-lg bg-slate-100 p-3 text-sm font-semibold text-slate-700">
+      {message}
+    </p>
+  ) : null;
 }
 
 function IconFact({ icon, text }: { icon: React.ReactNode; text: string }) {

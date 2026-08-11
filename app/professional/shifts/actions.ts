@@ -7,13 +7,31 @@ import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { shiftInterestSchema } from "@/lib/validation/account";
+import {
+  bookingResponseSchema,
+  shiftInterestSchema
+} from "@/lib/validation/account";
 
 type BookingInsert = Database["public"]["Tables"]["bookings"]["Insert"];
 type BookingEventInsert = Database["public"]["Tables"]["booking_events"]["Insert"];
 
 type ProfessionalProfileRef = {
   id: string;
+};
+
+type BookingRef = {
+  id: string;
+  shift_id: string | null;
+  status:
+    | "invited"
+    | "interested"
+    | "requested"
+    | "pending_office_approval"
+    | "accepted"
+    | "confirmed"
+    | "declined"
+    | "cancelled"
+    | "completed";
 };
 
 type ShiftRef = {
@@ -118,4 +136,87 @@ export async function expressInterestInShift(formData: FormData) {
   revalidatePath("/professional/dashboard");
   revalidatePath("/office/dashboard");
   redirect("/professional/shifts?interest=sent");
+}
+
+export async function respondToAcceptedShift(formData: FormData) {
+  const user = await requireUser();
+  const parsed = bookingResponseSchema.safeParse({
+    action: formString(formData, "action"),
+    bookingId: formString(formData, "booking_id"),
+    shiftId: formString(formData, "shift_id")
+  });
+
+  if (!parsed.success) {
+    redirect("/professional/shifts");
+  }
+
+  if (!isSupabaseServiceRoleConfigured()) {
+    redirect("/professional/shifts?response=service_required");
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const { data: professionalProfile } = await supabase
+    .from("professional_profiles")
+    .select("id")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const professionalProfileRef = professionalProfile as ProfessionalProfileRef | null;
+
+  if (!professionalProfileRef) {
+    redirect("/professional/shifts?response=profile_required");
+  }
+
+  const { data: bookingData } = await supabase
+    .from("bookings")
+    .select("id, shift_id, status")
+    .eq("id", parsed.data.bookingId)
+    .eq("shift_id", parsed.data.shiftId)
+    .eq("professional_profile_id", professionalProfileRef.id)
+    .maybeSingle();
+
+  const booking = bookingData as BookingRef | null;
+
+  if (!booking || booking.status !== "accepted") {
+    redirect("/professional/shifts?response=unavailable");
+  }
+
+  const admin = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+  const confirms = parsed.data.action === "confirm";
+  const { error } = await admin
+    .from("bookings")
+    .update({
+      confirmed_at: confirms ? now : null,
+      status: confirms ? "confirmed" : "declined",
+      updated_at: now
+    } as never)
+    .eq("id", booking.id);
+
+  if (error) {
+    redirect("/professional/shifts?response=failed");
+  }
+
+  await admin
+    .from("shifts")
+    .update({
+      status: confirms ? "filled" : "open",
+      updated_at: now
+    } as never)
+    .eq("id", parsed.data.shiftId);
+
+  const eventPayload: BookingEventInsert = {
+    booking_id: booking.id,
+    actor_user_id: user.id,
+    event_type: confirms ? "professional_confirmed_shift" : "professional_declined_shift",
+    metadata: { shift_id: parsed.data.shiftId }
+  };
+
+  await admin.from("booking_events").insert([eventPayload] as never[]);
+
+  revalidatePath("/professional/shifts");
+  revalidatePath("/professional/dashboard");
+  revalidatePath("/office/dashboard");
+  revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
+  redirect(`/professional/shifts?response=${confirms ? "confirmed" : "declined"}`);
 }

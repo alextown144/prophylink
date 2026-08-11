@@ -93,6 +93,12 @@ export const bookingSelectionSchema = z.object({
   shiftId: z.string().uuid()
 });
 
+export const bookingResponseSchema = z.object({
+  action: z.enum(["confirm", "decline"]),
+  bookingId: z.string().uuid(),
+  shiftId: z.string().uuid()
+});
+
 export const createInvitationSchema = z.object({
   email: z.string().email(),
   accountKind: accountKindSchema,

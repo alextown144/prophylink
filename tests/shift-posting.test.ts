@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  bookingResponseSchema,
   bookingSelectionSchema,
   shiftInterestSchema,
   shiftPostingSchema,
@@ -81,5 +82,27 @@ describe("bookingSelectionSchema", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe("bookingResponseSchema", () => {
+  it("accepts a professional confirmation response", () => {
+    const result = bookingResponseSchema.safeParse({
+      action: "confirm",
+      bookingId: "77777777-7777-4777-8777-777777777777",
+      shiftId: "88888888-8888-4888-8888-888888888888"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects unsupported booking responses", () => {
+    const result = bookingResponseSchema.safeParse({
+      action: "maybe",
+      bookingId: "77777777-7777-4777-8777-777777777777",
+      shiftId: "88888888-8888-4888-8888-888888888888"
+    });
+
+    expect(result.success).toBe(false);
   });
 });

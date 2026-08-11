@@ -59,10 +59,33 @@ type ProfessionalRole = {
   slug: string;
 };
 
+type BookingSummary = {
+  id: string;
+  agreed_ends_at: string;
+  agreed_hourly_rate_cents: number | null;
+  agreed_starts_at: string;
+  status:
+    | "invited"
+    | "interested"
+    | "requested"
+    | "pending_office_approval"
+    | "accepted"
+    | "confirmed"
+    | "declined"
+    | "cancelled"
+    | "completed";
+};
+
 export default async function ProfessionalDashboardPage() {
   const user = await requireUser();
-  const { accountRoles, availabilityRules, profile, professionalProfile, professionalRole } =
-    await getProfessionalDashboardData(user.id);
+  const {
+    accountRoles,
+    availabilityRules,
+    bookingSummaries,
+    profile,
+    professionalProfile,
+    professionalRole
+  } = await getProfessionalDashboardData(user.id);
   const isAdmin = accountRoles.some((role) => role.kind === "admin");
   const professionalRoleRecord = accountRoles.find((role) => role.kind === "professional");
   const displayName = profile?.display_name || user.email || "there";
@@ -120,8 +143,8 @@ export default async function ProfessionalDashboardPage() {
         />
         <StatusMetric
           icon={<CalendarDays className="h-5 w-5" />}
-          label="Availability rules"
-          value={String(availabilityRules.length)}
+          label="Shift responses"
+          value={String(bookingSummaries.length)}
         />
       </section>
 
@@ -170,8 +193,16 @@ export default async function ProfessionalDashboardPage() {
             <ChecklistItem complete={availabilityRules.length > 0} label="Availability saved" />
             <NextStep
               href="/professional/shifts"
-              label="Browse open shifts"
-              text="Review office-posted coverage needs and send interest."
+              label={
+                bookingSummaries.some((booking) => booking.status === "accepted")
+                  ? "Confirm accepted shift"
+                  : "Browse open shifts"
+              }
+              text={
+                bookingSummaries.some((booking) => booking.status === "accepted")
+                  ? "An office accepted your interest. Confirm or decline the shift."
+                  : "Review office-posted coverage needs and send interest."
+              }
             />
             <NextStep
               href="/professional/availability"
@@ -194,6 +225,32 @@ export default async function ProfessionalDashboardPage() {
       </section>
 
       <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-teal-700" />
+              Shift responses
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {bookingSummaries.length > 0 ? (
+              bookingSummaries.slice(0, 4).map((booking) => (
+                <BookingPreview key={booking.id} booking={booking} />
+              ))
+            ) : (
+              <div className="rounded-lg bg-slate-50 p-4">
+                <p className="font-semibold text-slate-950">No shift responses yet</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Browse open shifts and send interest when one fits your schedule.
+                </p>
+                <Button asChild className="mt-4">
+                  <Link href="/professional/shifts">Browse shifts</Link>
+                </Button>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -229,7 +286,7 @@ export default async function ProfessionalDashboardPage() {
         <FutureCard
           icon={<ArrowRight className="h-5 w-5" />}
           title="Shift matching"
-          text="Open shift browsing is now live; matching and confirmation logic comes next."
+          text="Open browsing and confirmation are live; availability-based matching comes next."
         />
       </section>
     </main>
@@ -269,26 +326,61 @@ async function getProfessionalDashboardData(userId: string) {
   }
 
   let availabilityRules: AvailabilityRule[] = [];
+  let bookingSummaries: BookingSummary[] = [];
 
   if (professionalProfile?.id) {
-    const { data } = await supabase
-      .from("availability_rules")
-      .select(
-        "id, kind, starts_at, ends_at, recurrence_rule, recurrence_starts_on, recurrence_ends_on, notes"
-      )
-      .eq("professional_profile_id", professionalProfile.id)
-      .order("created_at", { ascending: false })
-      .limit(6);
-    availabilityRules = (data ?? []) as AvailabilityRule[];
+    const [availabilityResult, bookingResult] = await Promise.all([
+      supabase
+        .from("availability_rules")
+        .select(
+          "id, kind, starts_at, ends_at, recurrence_rule, recurrence_starts_on, recurrence_ends_on, notes"
+        )
+        .eq("professional_profile_id", professionalProfile.id)
+        .order("created_at", { ascending: false })
+        .limit(6),
+      supabase
+        .from("bookings")
+        .select("id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at")
+        .eq("professional_profile_id", professionalProfile.id)
+        .order("created_at", { ascending: false })
+        .limit(6)
+    ]);
+    availabilityRules = (availabilityResult.data ?? []) as AvailabilityRule[];
+    bookingSummaries = (bookingResult.data ?? []) as BookingSummary[];
   }
 
   return {
     accountRoles: (rolesResult.data ?? []) as AccountRole[],
     availabilityRules,
+    bookingSummaries,
     profile: profileResult.data as UserProfile | null,
     professionalProfile,
     professionalRole
   };
+}
+
+function BookingPreview({ booking }: { booking: BookingSummary }) {
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-semibold text-slate-950">
+          {formatShiftDate(booking.agreed_starts_at)}
+        </p>
+        <Badge variant={booking.status === "accepted" ? "default" : "outline"}>
+          {formatStatus(booking.status)}
+        </Badge>
+      </div>
+      <p className="mt-2 text-sm text-slate-600">
+        {formatShiftTime(booking.agreed_starts_at, booking.agreed_ends_at)} -{" "}
+        {formatRate(booking.agreed_hourly_rate_cents)}
+      </p>
+      {booking.status === "accepted" ? (
+        <Button asChild className="mt-4" size="sm">
+          <Link href="/professional/shifts">Confirm or decline</Link>
+        </Button>
+      ) : null}
+    </div>
+  );
 }
 
 function AvailabilityPreview({ rule }: { rule: AvailabilityRule }) {
@@ -420,4 +512,28 @@ function formatYears(value?: number | string | null) {
 
 function formatLocation(city?: string | null, state?: string | null, postalCode?: string | null) {
   return [city, state, postalCode].filter(Boolean).join(", ") || "Not saved";
+}
+
+function formatShiftDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: "America/Los_Angeles"
+  }).format(new Date(value));
+}
+
+function formatShiftTime(startsAt: string, endsAt: string) {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/Los_Angeles"
+  });
+
+  return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
+}
+
+function formatStatus(value: string) {
+  return value
+    .split("_")
+    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(" ");
 }
