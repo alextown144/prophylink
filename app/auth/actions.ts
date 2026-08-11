@@ -86,6 +86,7 @@ export async function signUpWithAccount(
     email,
     password,
     options: {
+      emailRedirectTo: `${getAppBaseUrl()}/login?confirmed=1`,
       data: {
         account_kind: accountKind,
         signup_invitation_id: signupInvitationId
@@ -134,4 +135,16 @@ export async function signUpWithAccount(
     message:
       "Account created. Continue to onboarding after email confirmation if it is enabled."
   };
+}
+
+function getAppBaseUrl() {
+  const configuredUrl = publicEnv.NEXT_PUBLIC_APP_URL.replace(/\/$/, "");
+
+  if (configuredUrl !== "http://localhost:3000") {
+    return configuredUrl;
+  }
+
+  const vercelUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL || process.env.VERCEL_URL;
+
+  return vercelUrl ? `https://${vercelUrl.replace(/\/$/, "")}` : configuredUrl;
 }

@@ -62,6 +62,18 @@ Summary:
 3. Deploy Preview.
 4. Run smoke tests against login, signup, public landing page, and dashboard shells.
 
+## Supabase Auth Redirects
+
+In Supabase Dashboard > Authentication > URL Configuration:
+
+- Set Site URL to the production app URL, for example `https://prophylink.vercel.app`.
+- Add Redirect URLs:
+  - `https://prophylink.vercel.app/**`
+  - `http://localhost:3000/**` for local development only.
+
+If Site URL is left as `http://localhost:3000`, signup confirmation emails can
+send users to localhost on mobile devices and consume the one-time token.
+
 ## Legal and Compliance Gate
 
 Before public launch, review `docs/LEGAL_REVIEW_NEEDED.md`.
