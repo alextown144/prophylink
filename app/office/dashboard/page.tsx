@@ -52,6 +52,7 @@ type PostedShift = {
   starts_at: string;
   ends_at: string;
   hourly_rate_cents: number | null;
+  interested_count: number;
   office_locations: {
     name: string | null;
     city: string;
@@ -281,7 +282,8 @@ async function getOfficeDashboardData(userId: string) {
     };
   }
 
-  const [organizationResult, locationsResult, shiftsResult] = await Promise.all([
+  const [organizationResult, locationsResult, shiftsResult, bookingsResult] =
+    await Promise.all([
     supabase
       .from("organizations")
       .select("id, name, primary_email, primary_phone, website")
@@ -301,14 +303,38 @@ async function getOfficeDashboardData(userId: string) {
       )
       .eq("organization_id", organizationId)
       .order("starts_at", { ascending: true })
-      .limit(6)
+      .limit(6),
+    supabase
+      .from("bookings")
+      .select("shift_id, status")
+      .eq("organization_id", organizationId)
   ]);
+  const interestCountByShiftId = new Map<string, number>();
+
+  ((bookingsResult.data ?? []) as { shift_id: string | null; status: string }[]).forEach(
+    (booking) => {
+      if (!booking.shift_id || booking.status !== "interested") {
+        return;
+      }
+
+      interestCountByShiftId.set(
+        booking.shift_id,
+        (interestCountByShiftId.get(booking.shift_id) ?? 0) + 1
+      );
+    }
+  );
+  const shifts = ((shiftsResult.data ?? []) as Omit<PostedShift, "interested_count">[]).map(
+    (shift) => ({
+      ...shift,
+      interested_count: interestCountByShiftId.get(shift.id) ?? 0
+    })
+  );
 
   return {
     accountRoles: (rolesResult.data ?? []) as AccountRole[],
     locations: (locationsResult.data ?? []) as Location[],
     organization: organizationResult.data as Organization | null,
-    shifts: (shiftsResult.data ?? []) as PostedShift[]
+    shifts
   };
 }
 
@@ -374,6 +400,9 @@ function PostedShiftRow({ shift }: { shift: PostedShift }) {
           </Badge>
           <span className="text-sm font-semibold text-teal-700">
             {formatRate(shift.hourly_rate_cents)}
+          </span>
+          <span className="text-xs font-semibold text-slate-500">
+            {shift.interested_count} interested
           </span>
         </div>
       </div>

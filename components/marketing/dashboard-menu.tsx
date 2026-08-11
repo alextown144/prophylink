@@ -145,6 +145,11 @@ function buildDashboardLinks(roles: AccountKind[]): DashboardLink[] {
         section: "Professional"
       },
       {
+        href: "/professional/shifts",
+        label: "Browse shifts",
+        section: "Professional"
+      },
+      {
         href: "/professional/availability",
         label: "Availability calendar",
         section: "Professional"

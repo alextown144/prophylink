@@ -86,6 +86,9 @@ export default async function ProfessionalDashboardPage() {
         </div>
         <div className="flex flex-wrap gap-3">
           <Button asChild>
+            <Link href="/professional/shifts">Browse shifts</Link>
+          </Button>
+          <Button asChild>
             <Link href="/professional/availability">Manage availability</Link>
           </Button>
           <Button asChild variant="outline">
@@ -166,6 +169,11 @@ export default async function ProfessionalDashboardPage() {
             <ChecklistItem complete={Boolean(professionalProfile)} label="Profile foundation saved" />
             <ChecklistItem complete={availabilityRules.length > 0} label="Availability saved" />
             <NextStep
+              href="/professional/shifts"
+              label="Browse open shifts"
+              text="Review office-posted coverage needs and send interest."
+            />
+            <NextStep
               href="/professional/availability"
               label="Manage availability calendar"
               text="Add individual dates or weekly repeating availability."
@@ -221,7 +229,7 @@ export default async function ProfessionalDashboardPage() {
         <FutureCard
           icon={<ArrowRight className="h-5 w-5" />}
           title="Shift matching"
-          text="Marketplace matching will build on this saved profile foundation."
+          text="Open shift browsing is now live; matching and confirmation logic comes next."
         />
       </section>
     </main>

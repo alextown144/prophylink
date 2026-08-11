@@ -79,6 +79,74 @@ export type Database = {
           updated_at?: string;
         }
       >;
+      booking_events: Table<
+        {
+          id: string;
+          booking_id: string;
+          actor_user_id: string | null;
+          event_type: string;
+          metadata: Json;
+          created_at: string;
+        },
+        {
+          id?: string;
+          booking_id: string;
+          actor_user_id?: string | null;
+          event_type: string;
+          metadata?: Json;
+          created_at?: string;
+        }
+      >;
+      bookings: Table<
+        {
+          id: string;
+          shift_id: string | null;
+          organization_id: string;
+          office_location_id: string;
+          professional_profile_id: string;
+          status: Database["public"]["Enums"]["booking_status"];
+          agreed_hourly_rate_cents: number | null;
+          agreed_starts_at: string;
+          agreed_ends_at: string;
+          cancelled_reason: string | null;
+          confirmed_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          shift_id?: string | null;
+          organization_id: string;
+          office_location_id: string;
+          professional_profile_id: string;
+          status?: Database["public"]["Enums"]["booking_status"];
+          agreed_hourly_rate_cents?: number | null;
+          agreed_starts_at: string;
+          agreed_ends_at: string;
+          cancelled_reason?: string | null;
+          confirmed_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        },
+        {
+          id?: string;
+          shift_id?: string | null;
+          organization_id?: string;
+          office_location_id?: string;
+          professional_profile_id?: string;
+          status?: Database["public"]["Enums"]["booking_status"];
+          agreed_hourly_rate_cents?: number | null;
+          agreed_starts_at?: string;
+          agreed_ends_at?: string;
+          cancelled_reason?: string | null;
+          confirmed_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+      >;
       office_locations: Table<
         {
           id: string;

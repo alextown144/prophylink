@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { shiftPostingSchema } from "@/lib/validation/account";
+import { shiftInterestSchema, shiftPostingSchema } from "@/lib/validation/account";
 
 const baseShift = {
   officeLocationId: "11111111-1111-4111-8111-111111111111",
@@ -33,6 +33,24 @@ describe("shiftPostingSchema", () => {
     const result = shiftPostingSchema.safeParse({
       ...baseShift,
       unpaidLunchMinutes: "30.5"
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("shiftInterestSchema", () => {
+  it("accepts a shift id for professional interest", () => {
+    const result = shiftInterestSchema.safeParse({
+      shiftId: "33333333-3333-4333-8333-333333333333"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed shift ids", () => {
+    const result = shiftInterestSchema.safeParse({
+      shiftId: "not-a-shift-id"
     });
 
     expect(result.success).toBe(false);

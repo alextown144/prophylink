@@ -71,6 +71,10 @@ export const shiftPostingSchema = z
     path: ["endTime"]
   });
 
+export const shiftInterestSchema = z.object({
+  shiftId: z.string().uuid()
+});
+
 export const createInvitationSchema = z.object({
   email: z.string().email(),
   accountKind: accountKindSchema,
