@@ -317,15 +317,17 @@ function ShiftCard({
               <DetailBlock label="Arrival" value={shift.arrival_instructions} />
             </div>
           </div>
-          <div className="rounded-lg bg-slate-50 p-4">
-            <p className="text-sm font-semibold text-slate-500">Lunch</p>
-            <p className="mt-1 font-semibold text-slate-950">
-              {shift.unpaid_lunch_minutes
-                ? `${shift.unpaid_lunch_minutes} unpaid min`
-                : "Not specified"}
-            </p>
+          <div className="grid content-start gap-4">
+            {shift.unpaid_lunch_minutes ? (
+              <div className="rounded-lg bg-slate-50 p-4">
+                <p className="text-sm font-semibold text-slate-500">Lunch</p>
+                <p className="mt-1 font-semibold text-slate-950">
+                  {shift.unpaid_lunch_minutes} unpaid min
+                </p>
+              </div>
+            ) : null}
             {booking ? (
-              <div className="mt-5 rounded-lg border bg-white p-3">
+              <div className="rounded-lg border bg-white p-3">
                 <p className="flex items-center gap-2 text-sm font-semibold text-teal-700">
                   <CheckCircle2 className="h-4 w-4" />
                   Interest sent
@@ -335,7 +337,7 @@ function ShiftCard({
                 </p>
               </div>
             ) : (
-              <form action={expressInterestInShift} className="mt-5">
+              <form action={expressInterestInShift}>
                 <input name="shift_id" type="hidden" value={shift.id} />
                 <Button className="w-full" type="submit">
                   I&apos;m interested
