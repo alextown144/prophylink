@@ -26,7 +26,7 @@ export function InvitationForm() {
         <form action={formAction} className="grid gap-4 md:grid-cols-[1fr_12rem_12rem_auto]">
           <div className="grid gap-2">
             <Label htmlFor="email">Email</Label>
-            <Input id="email" name="email" placeholder="user@example.com" type="email" />
+            <Input id="email" name="email" placeholder="user@example.com" required type="email" />
           </div>
           <div className="grid gap-2">
             <Label htmlFor="account_kind">Account type</Label>
@@ -50,7 +50,7 @@ export function InvitationForm() {
             <p className="rounded-lg bg-slate-100 p-3 text-sm text-slate-700 md:col-span-4" role="status">
               {state.message}
               {state.inviteCode ? (
-                <span className="mt-2 block font-mono text-slate-950">
+                <span className="mt-2 block rounded-md bg-white p-2 font-mono text-slate-950">
                   {state.inviteCode}
                 </span>
               ) : null}
