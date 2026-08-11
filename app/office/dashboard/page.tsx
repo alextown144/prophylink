@@ -404,6 +404,16 @@ function PostedShiftRow({ shift }: { shift: PostedShift }) {
           <span className="text-xs font-semibold text-slate-500">
             {shift.interested_count} interested
           </span>
+          <div className="flex gap-2">
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/office/shifts/${shift.id}`}>Review</Link>
+            </Button>
+            {shift.status === "draft" || shift.status === "open" ? (
+              <Button asChild size="sm" variant="ghost">
+                <Link href={`/office/shifts/${shift.id}/edit`}>Edit</Link>
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </div>

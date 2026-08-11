@@ -1,26 +1,10 @@
 import { ArrowLeft, Building2 } from "lucide-react";
 import Link from "next/link";
 import { requireUser } from "@/lib/auth/session";
-import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { ShiftPostingForm } from "@/components/office/shift-posting-form";
-
-type OrganizationMembership = {
-  organization_id: string;
-};
-
-type LocationRecord = {
-  id: string;
-  name: string | null;
-  city: string;
-  state: string;
-};
-
-type ProfessionalRoleRecord = {
-  id: string;
-  name: string;
-};
+import { getShiftFormData } from "../data";
 
 export default async function NewOfficeShiftPage() {
   const user = await requireUser();
@@ -62,47 +46,4 @@ export default async function NewOfficeShiftPage() {
       )}
     </main>
   );
-}
-
-async function getShiftFormData(userId: string) {
-  const supabase = await createSupabaseServerClient();
-  const { data: membership } = await supabase
-    .from("organization_members")
-    .select("organization_id")
-    .eq("user_id", userId)
-    .limit(1)
-    .maybeSingle();
-
-  const organizationMembership = membership as OrganizationMembership | null;
-
-  if (!organizationMembership?.organization_id) {
-    return { locations: [], roles: [] };
-  }
-
-  const [locationsResult, rolesResult] = await Promise.all([
-    supabase
-      .from("office_locations")
-      .select("id, name, city, state")
-      .eq("organization_id", organizationMembership.organization_id)
-      .order("name", { ascending: true }),
-    supabase
-      .from("professional_roles")
-      .select("id, name")
-      .eq("enabled", true)
-      .order("name", { ascending: true })
-  ]);
-
-  const locationRecords = (locationsResult.data ?? []) as LocationRecord[];
-  const roleRecords = (rolesResult.data ?? []) as ProfessionalRoleRecord[];
-
-  return {
-    locations: locationRecords.map((location) => ({
-      id: location.id,
-      label: `${location.name ?? "Office location"} - ${location.city}, ${location.state}`
-    })),
-    roles: roleRecords.map((role) => ({
-      id: role.id,
-      label: role.name
-    }))
-  };
 }

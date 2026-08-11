@@ -3,11 +3,18 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
+import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
-import { dollarsToCents, shiftPostingSchema } from "@/lib/validation/account";
+import {
+  bookingSelectionSchema,
+  dollarsToCents,
+  shiftPostingSchema,
+  shiftUpdateSchema
+} from "@/lib/validation/account";
 
-type ActionResult = {
+export type OfficeShiftActionResult = {
   ok: boolean;
   message: string;
 };
@@ -16,9 +23,28 @@ type OrganizationMembership = {
   organization_id: string;
 };
 
+type BookingEventInsert = Database["public"]["Tables"]["booking_events"]["Insert"];
 type ShiftInsert = Database["public"]["Tables"]["shifts"]["Insert"];
+type ShiftUpdate = Database["public"]["Tables"]["shifts"]["Update"];
+
+type BookingSelection = {
+  id: string;
+  shift_id: string | null;
+  organization_id: string;
+  status:
+    | "invited"
+    | "interested"
+    | "requested"
+    | "pending_office_approval"
+    | "accepted"
+    | "confirmed"
+    | "declined"
+    | "cancelled"
+    | "completed";
+};
 
 const timezone = "America/Los_Angeles";
+const editableShiftStatuses = new Set(["draft", "open"]);
 
 function formString(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -26,25 +52,11 @@ function formString(formData: FormData, key: string) {
 }
 
 export async function postOfficeShift(
-  _previousState: ActionResult,
+  _previousState: OfficeShiftActionResult,
   formData: FormData
-): Promise<ActionResult> {
+): Promise<OfficeShiftActionResult> {
   const user = await requireUser();
-  const parsed = shiftPostingSchema.safeParse({
-    officeLocationId: formString(formData, "office_location_id"),
-    professionalRoleId: formString(formData, "professional_role_id"),
-    status: formString(formData, "status") || "open",
-    date: formString(formData, "date"),
-    startTime: formString(formData, "start_time"),
-    endTime: formString(formData, "end_time"),
-    hourlyRate: formString(formData, "hourly_rate").replace("$", ""),
-    unpaidLunchMinutes: formString(formData, "unpaid_lunch_minutes"),
-    description: formString(formData, "description"),
-    requiredNotes: formString(formData, "required_notes"),
-    dressRequirements: formString(formData, "dress_requirements"),
-    parkingInstructions: formString(formData, "parking_instructions"),
-    arrivalInstructions: formString(formData, "arrival_instructions")
-  });
+  const parsed = shiftPostingSchema.safeParse(getShiftFormInput(formData));
 
   if (!parsed.success) {
     return { ok: false, message: "Check the shift details and time range." };
@@ -115,6 +127,225 @@ export async function postOfficeShift(
   revalidatePath("/office/dashboard");
   revalidatePath("/office/shifts/new");
   redirect("/office/dashboard");
+}
+
+export async function updateOfficeShift(
+  _previousState: OfficeShiftActionResult,
+  formData: FormData
+): Promise<OfficeShiftActionResult> {
+  const user = await requireUser();
+  const parsed = shiftUpdateSchema.safeParse({
+    ...getShiftFormInput(formData),
+    shiftId: formString(formData, "shift_id")
+  });
+
+  if (!parsed.success) {
+    return { ok: false, message: "Check the shift details and time range." };
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const organizationId = await getCurrentOrganizationId(supabase, user.id);
+
+  if (!organizationId) {
+    return { ok: false, message: "Complete your office setup before editing shifts." };
+  }
+
+  const shift = parsed.data;
+  const [existingShiftResult, locationResult, roleResult] = await Promise.all([
+    supabase
+      .from("shifts")
+      .select("id, status")
+      .eq("id", shift.shiftId)
+      .eq("organization_id", organizationId)
+      .maybeSingle(),
+    supabase
+      .from("office_locations")
+      .select("id")
+      .eq("id", shift.officeLocationId)
+      .eq("organization_id", organizationId)
+      .maybeSingle(),
+    supabase
+      .from("professional_roles")
+      .select("id")
+      .eq("id", shift.professionalRoleId)
+      .eq("enabled", true)
+      .maybeSingle()
+  ]);
+
+  if (!existingShiftResult.data) {
+    return { ok: false, message: "Shift was not found for this office." };
+  }
+
+  const existingShift = existingShiftResult.data as {
+    id: string;
+    status: string;
+  };
+
+  if (!editableShiftStatuses.has(existingShift.status)) {
+    return { ok: false, message: "Only draft or open shifts can be edited." };
+  }
+
+  if (!locationResult.data) {
+    return { ok: false, message: "Choose one of your saved office locations." };
+  }
+
+  if (!roleResult.data) {
+    return { ok: false, message: "Choose an available professional role." };
+  }
+
+  const payload: ShiftUpdate = {
+    office_location_id: shift.officeLocationId,
+    professional_role_id: shift.professionalRoleId,
+    status: shift.status,
+    starts_at: localPacificDateTimeToIso(shift.date, shift.startTime),
+    ends_at: localPacificDateTimeToIso(shift.date, shift.endTime),
+    timezone,
+    hourly_rate_cents: dollarsToCents(shift.hourlyRate),
+    unpaid_lunch_minutes: shift.unpaidLunchMinutes ?? null,
+    description: shift.description || null,
+    required_notes: shift.requiredNotes || null,
+    dress_requirements: shift.dressRequirements || null,
+    parking_instructions: shift.parkingInstructions || null,
+    arrival_instructions: shift.arrivalInstructions || null,
+    updated_at: new Date().toISOString()
+  };
+
+  const { error } = await supabase
+    .from("shifts")
+    .update(payload as never)
+    .eq("id", shift.shiftId)
+    .eq("organization_id", organizationId);
+
+  if (error) {
+    return { ok: false, message: "Shift could not be updated." };
+  }
+
+  revalidatePath("/office/dashboard");
+  revalidatePath(`/office/shifts/${shift.shiftId}`);
+  revalidatePath(`/office/shifts/${shift.shiftId}/edit`);
+  revalidatePath("/professional/shifts");
+  redirect(`/office/shifts/${shift.shiftId}?updated=1`);
+}
+
+export async function acceptInterestedProfessional(formData: FormData) {
+  const user = await requireUser();
+  const parsed = bookingSelectionSchema.safeParse({
+    bookingId: formString(formData, "booking_id"),
+    shiftId: formString(formData, "shift_id")
+  });
+
+  if (!parsed.success) {
+    redirect("/office/dashboard");
+  }
+
+  if (!isSupabaseServiceRoleConfigured()) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=service_required`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const organizationId = await getCurrentOrganizationId(supabase, user.id);
+
+  if (!organizationId) {
+    redirect("/office/dashboard");
+  }
+
+  const { data } = await supabase
+    .from("bookings")
+    .select("id, shift_id, organization_id, status")
+    .eq("id", parsed.data.bookingId)
+    .eq("shift_id", parsed.data.shiftId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  const booking = data as BookingSelection | null;
+
+  if (!booking || booking.status !== "interested") {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=unavailable`);
+  }
+
+  const admin = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+
+  const { error } = await admin
+    .from("bookings")
+    .update({
+      status: "accepted",
+      updated_at: now
+    } as never)
+    .eq("id", booking.id);
+
+  if (error) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=failed`);
+  }
+
+  await admin
+    .from("bookings")
+    .update({
+      status: "declined",
+      updated_at: now
+    } as never)
+    .eq("shift_id", parsed.data.shiftId)
+    .eq("organization_id", organizationId)
+    .eq("status", "interested")
+    .neq("id", booking.id);
+
+  await admin
+    .from("shifts")
+    .update({
+      status: "pending",
+      updated_at: now
+    } as never)
+    .eq("id", parsed.data.shiftId)
+    .eq("organization_id", organizationId);
+
+  const eventPayload: BookingEventInsert = {
+    booking_id: booking.id,
+    actor_user_id: user.id,
+    event_type: "office_accepted_professional",
+    metadata: { shift_id: parsed.data.shiftId }
+  };
+
+  await admin.from("booking_events").insert([eventPayload] as never[]);
+
+  revalidatePath("/office/dashboard");
+  revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
+  revalidatePath("/professional/shifts");
+  revalidatePath("/professional/dashboard");
+  redirect(`/office/shifts/${parsed.data.shiftId}?selection=accepted`);
+}
+
+function getShiftFormInput(formData: FormData) {
+  return {
+    officeLocationId: formString(formData, "office_location_id"),
+    professionalRoleId: formString(formData, "professional_role_id"),
+    status: formString(formData, "status") || "open",
+    date: formString(formData, "date"),
+    startTime: formString(formData, "start_time"),
+    endTime: formString(formData, "end_time"),
+    hourlyRate: formString(formData, "hourly_rate").replace("$", ""),
+    unpaidLunchMinutes: formString(formData, "unpaid_lunch_minutes"),
+    description: formString(formData, "description"),
+    requiredNotes: formString(formData, "required_notes"),
+    dressRequirements: formString(formData, "dress_requirements"),
+    parkingInstructions: formString(formData, "parking_instructions"),
+    arrivalInstructions: formString(formData, "arrival_instructions")
+  };
+}
+
+async function getCurrentOrganizationId(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  userId: string
+) {
+  const { data: membership } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", userId)
+    .limit(1)
+    .maybeSingle();
+
+  const organizationMembership = membership as OrganizationMembership | null;
+
+  return organizationMembership?.organization_id ?? null;
 }
 
 function localPacificDateTimeToIso(date: string, time: string) {

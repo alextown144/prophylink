@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { shiftInterestSchema, shiftPostingSchema } from "@/lib/validation/account";
+import {
+  bookingSelectionSchema,
+  shiftInterestSchema,
+  shiftPostingSchema,
+  shiftUpdateSchema
+} from "@/lib/validation/account";
 
 const baseShift = {
   officeLocationId: "11111111-1111-4111-8111-111111111111",
@@ -54,5 +59,27 @@ describe("shiftInterestSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("shiftUpdateSchema", () => {
+  it("requires an editable shift id", () => {
+    const result = shiftUpdateSchema.safeParse({
+      ...baseShift,
+      shiftId: "44444444-4444-4444-8444-444444444444"
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("bookingSelectionSchema", () => {
+  it("accepts the booking and shift ids needed for office selection", () => {
+    const result = bookingSelectionSchema.safeParse({
+      bookingId: "55555555-5555-4555-8555-555555555555",
+      shiftId: "66666666-6666-4666-8666-666666666666"
+    });
+
+    expect(result.success).toBe(true);
   });
 });

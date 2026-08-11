@@ -53,6 +53,9 @@ type OpenShift = {
 
 type BookingInterest = {
   shift_id: string | null;
+  agreed_hourly_rate_cents?: number | null;
+  agreed_starts_at?: string;
+  agreed_ends_at?: string;
   status:
     | "invited"
     | "interested"
@@ -72,7 +75,7 @@ export default async function ProfessionalShiftsPage({
 }) {
   const user = await requireUser();
   const { interest } = await searchParams;
-  const { bookingsByShiftId, openShifts, professionalProfile } = await getShiftBoardData(
+  const { bookingsByShiftId, myBookings, openShifts, professionalProfile } = await getShiftBoardData(
     user.id
   );
 
@@ -119,29 +122,49 @@ export default async function ProfessionalShiftsPage({
           </CardContent>
         </Card>
       ) : (
-        <section className="grid gap-4">
-          {openShifts.length > 0 ? (
-            openShifts.map((shift) => (
-              <ShiftCard
-                booking={bookingsByShiftId.get(shift.id)}
-                isRoleMatch={
-                  shift.professional_roles?.id === professionalProfile.professional_role_id
-                }
-                key={shift.id}
-                shift={shift}
-              />
-            ))
-          ) : (
-            <Card>
-              <CardContent className="p-6">
-                <p className="font-semibold text-slate-950">No open shifts yet</p>
-                <p className="mt-2 leading-7 text-slate-600">
-                  Office-posted shifts will appear here as soon as they are open.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-        </section>
+        <>
+          {myBookings.length > 0 ? (
+            <section className="mb-6">
+              <Card>
+                <CardContent className="p-5">
+                  <h2 className="font-semibold text-slate-950">Your shift responses</h2>
+                  <div className="mt-4 grid gap-3">
+                    {myBookings.map((booking) => (
+                      <ResponseRow
+                        booking={booking}
+                        key={`${booking.shift_id}-${booking.status}`}
+                      />
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </section>
+          ) : null}
+
+          <section className="grid gap-4">
+            {openShifts.length > 0 ? (
+              openShifts.map((shift) => (
+                <ShiftCard
+                  booking={bookingsByShiftId.get(shift.id)}
+                  isRoleMatch={
+                    shift.professional_roles?.id === professionalProfile.professional_role_id
+                  }
+                  key={shift.id}
+                  shift={shift}
+                />
+              ))
+            ) : (
+              <Card>
+                <CardContent className="p-6">
+                  <p className="font-semibold text-slate-950">No open shifts yet</p>
+                  <p className="mt-2 leading-7 text-slate-600">
+                    Office-posted shifts will appear here as soon as they are open.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </section>
+        </>
       )}
     </main>
   );
@@ -169,8 +192,9 @@ async function getShiftBoardData(userId: string) {
     professionalProfile
       ? supabase
           .from("bookings")
-          .select("shift_id, status")
+          .select("shift_id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at")
           .eq("professional_profile_id", professionalProfile.id)
+          .order("created_at", { ascending: false })
       : Promise.resolve({ data: [] })
   ]);
 
@@ -185,9 +209,37 @@ async function getShiftBoardData(userId: string) {
 
   return {
     bookingsByShiftId,
+    myBookings: bookings,
     openShifts: (openShiftsResult.data ?? []) as OpenShift[],
     professionalProfile
   };
+}
+
+function ResponseRow({ booking }: { booking: BookingInterest }) {
+  return (
+    <div className="flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row sm:items-center">
+      <div>
+        <p className="font-semibold text-slate-950">
+          {booking.agreed_starts_at && booking.agreed_ends_at
+            ? formatShiftTime(booking.agreed_starts_at, booking.agreed_ends_at)
+            : "Shift response"}
+        </p>
+        {booking.agreed_starts_at ? (
+          <p className="mt-1 text-sm text-slate-600">
+            {formatShiftDate(booking.agreed_starts_at)}
+          </p>
+        ) : null}
+      </div>
+      <div className="flex items-center gap-2">
+        <Badge variant={booking.status === "accepted" ? "default" : "outline"}>
+          {formatStatus(booking.status)}
+        </Badge>
+        <span className="text-sm font-semibold text-teal-700">
+          {formatRate(booking.agreed_hourly_rate_cents ?? null)}
+        </span>
+      </div>
+    </div>
+  );
 }
 
 function ShiftCard({
