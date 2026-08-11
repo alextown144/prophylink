@@ -1,0 +1,45 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background: 190 33% 98%;
+  --foreground: 205 54% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 205 54% 16%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 205 54% 16%;
+  --primary: 190 87% 28%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 198 38% 93%;
+  --secondary-foreground: 205 54% 16%;
+  --muted: 200 24% 92%;
+  --muted-foreground: 202 20% 38%;
+  --accent: 168 62% 42%;
+  --accent-foreground: 0 0% 100%;
+  --destructive: 0 72% 51%;
+  --destructive-foreground: 0 0% 100%;
+  --border: 198 28% 84%;
+  --input: 198 28% 84%;
+  --ring: 190 87% 28%;
+  --radius: 0.5rem;
+}
+
+* {
+  border-color: hsl(var(--border));
+}
+
+body {
+  background:
+    radial-gradient(circle at 20% 0%, rgba(20, 184, 166, 0.12), transparent 24rem),
+    linear-gradient(180deg, #f7fbfb 0%, #eef7f6 50%, #ffffff 100%);
+  color: hsl(var(--foreground));
+}
+
+a {
+  text-underline-offset: 4px;
+}
+
+.focus-ring {
+  @apply outline-none ring-offset-2 ring-offset-background focus-visible:ring-2 focus-visible:ring-ring;
+}
