@@ -1,6 +1,6 @@
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
 import { BrandLogo } from "@/components/marketing/brand-logo";
+import { DashboardMenu } from "@/components/marketing/dashboard-menu";
 
 const navItems = [
   { href: "/#for-offices", label: "For Offices" },
@@ -28,14 +28,7 @@ export function SiteHeader() {
             </Link>
           ))}
         </nav>
-        <div className="flex items-center gap-2">
-          <Button asChild size="sm" variant="ghost">
-            <Link href="/login">Log in</Link>
-          </Button>
-          <Button asChild className="hidden sm:inline-flex" size="sm">
-            <Link href="/signup">Get Started</Link>
-          </Button>
-        </div>
+        <DashboardMenu />
       </div>
     </header>
   );
