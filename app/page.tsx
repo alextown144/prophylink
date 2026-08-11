@@ -105,7 +105,7 @@ export default function HomePage() {
                 </Link>
               </Button>
             </div>
-            <div className="mt-8 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            <div className="mt-8 grid gap-x-6 gap-y-4 sm:grid-cols-2">
               {trustPoints.map((point) => (
                 <MiniTrustCard key={point.title} {...point} />
               ))}
@@ -302,13 +302,15 @@ function MiniTrustCard({
   text: string;
 }) {
   return (
-    <div className="flex gap-3">
+    <div className="flex min-w-0 items-start gap-4 rounded-lg bg-white/80 p-3 shadow-sm ring-1 ring-[#E2E8F0]">
       <div className="flex h-12 w-12 flex-none items-center justify-center rounded-full bg-[#008F85] text-white shadow-sm">
         {icon}
       </div>
-      <div>
-        <p className="font-heading text-sm font-bold text-[#0B132B]">{title}</p>
-        <p className="mt-1 text-sm leading-5 text-[#24324B]">{text}</p>
+      <div className="min-w-0">
+        <p className="font-heading text-base font-bold leading-6 text-[#0B132B]">
+          {title}
+        </p>
+        <p className="mt-1 text-sm leading-6 text-[#24324B]">{text}</p>
       </div>
     </div>
   );

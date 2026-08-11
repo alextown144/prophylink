@@ -12,7 +12,7 @@ const navItems = [
 
 export function SiteHeader() {
   return (
-    <header className="sticky top-0 z-40 border-b border-[#E2E8F0] bg-white/92 backdrop-blur">
+    <header className="sticky top-0 z-40 border-b border-[#E2E8F0] bg-white shadow-sm">
       <div className="container flex min-h-20 items-center justify-between gap-4 py-3">
         <Link className="focus-ring rounded-sm" href="/">
           <BrandLogo markClassName="h-11 w-11" />
