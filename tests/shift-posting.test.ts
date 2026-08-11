@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   bookingResponseSchema,
   bookingSelectionSchema,
+  officeBookingLifecycleSchema,
   shiftInterestSchema,
   shiftPostingSchema,
   shiftUpdateSchema
@@ -101,6 +102,28 @@ describe("bookingResponseSchema", () => {
       action: "maybe",
       bookingId: "77777777-7777-4777-8777-777777777777",
       shiftId: "88888888-8888-4888-8888-888888888888"
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("officeBookingLifecycleSchema", () => {
+  it("accepts an office completion action", () => {
+    const result = officeBookingLifecycleSchema.safeParse({
+      action: "complete",
+      bookingId: "99999999-9999-4999-8999-999999999999",
+      shiftId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects unsupported office lifecycle actions", () => {
+    const result = officeBookingLifecycleSchema.safeParse({
+      action: "reopen",
+      bookingId: "99999999-9999-4999-8999-999999999999",
+      shiftId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
     });
 
     expect(result.success).toBe(false);

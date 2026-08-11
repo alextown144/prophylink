@@ -9,7 +9,10 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { acceptInterestedProfessional } from "@/app/office/shifts/actions";
+import {
+  acceptInterestedProfessional,
+  updateBookedShiftLifecycle
+} from "@/app/office/shifts/actions";
 import { getOfficeOrganizationId } from "@/app/office/shifts/data";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -22,6 +25,7 @@ type PageProps = {
     id: string;
   }>;
   searchParams: Promise<{
+    lifecycle?: string;
     selection?: string;
     updated?: string;
   }>;
@@ -65,6 +69,9 @@ type ShiftBooking = {
     | "completed";
   created_at: string;
   agreed_hourly_rate_cents: number | null;
+  cancelled_reason: string | null;
+  completed_at: string | null;
+  confirmed_at: string | null;
   professional_profiles: {
     hourly_rate_cents: number | null;
     preferred_radius_miles: number | string | null;
@@ -121,7 +128,11 @@ export default async function OfficeShiftDetailPage({
         ) : null}
       </div>
 
-      <StatusMessage selection={messages.selection} updated={messages.updated} />
+      <StatusMessage
+        lifecycle={messages.lifecycle}
+        selection={messages.selection}
+        updated={messages.updated}
+      />
 
       <section className="grid gap-6 lg:grid-cols-[1fr_0.8fr]">
         <Card>
@@ -207,7 +218,7 @@ async function getOfficeShiftDetail(userId: string, shiftId: string) {
     supabase
       .from("bookings")
       .select(
-        "id, status, created_at, agreed_hourly_rate_cents, professional_profiles(hourly_rate_cents, preferred_radius_miles, short_bio, years_experience, user_profiles(display_name, email, city, state), professional_roles(name))"
+        "id, status, created_at, agreed_hourly_rate_cents, cancelled_reason, completed_at, confirmed_at, professional_profiles(hourly_rate_cents, preferred_radius_miles, short_bio, years_experience, user_profiles(display_name, email, city, state), professional_roles(name))"
       )
       .eq("shift_id", shiftId)
       .eq("organization_id", organizationId)
@@ -230,6 +241,8 @@ function InterestedProfessionalCard({
   const profile = booking.professional_profiles;
   const userProfile = profile?.user_profiles;
   const canAccept = booking.status === "interested";
+  const canCancel = booking.status === "accepted" || booking.status === "confirmed";
+  const canComplete = booking.status === "confirmed";
   const displayName = userProfile?.display_name ?? "Professional";
   const profileFacts = [
     ["Role", profile?.professional_roles?.name],
@@ -286,20 +299,68 @@ function InterestedProfessionalCard({
           <Button type="submit">Accept professional</Button>
         </form>
       ) : null}
+      {canCancel || canComplete ? (
+        <div className="mt-4 grid gap-3 rounded-lg border bg-white p-3">
+          <div>
+            <p className="font-semibold text-slate-950">
+              {booking.status === "accepted"
+                ? "Waiting for professional confirmation"
+                : "Confirmed shift"}
+            </p>
+            <p className="mt-1 text-sm leading-6 text-slate-600">
+              {booking.status === "accepted"
+                ? "The professional can now confirm or decline this shift."
+                : "Mark the shift completed after the work day, or cancel if plans changed."}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {canComplete ? (
+              <form action={updateBookedShiftLifecycle}>
+                <input name="booking_id" type="hidden" value={booking.id} />
+                <input name="shift_id" type="hidden" value={shiftId} />
+                <input name="action" type="hidden" value="complete" />
+                <Button size="sm" type="submit">
+                  Mark completed
+                </Button>
+              </form>
+            ) : null}
+            {canCancel ? (
+              <form action={updateBookedShiftLifecycle}>
+                <input name="booking_id" type="hidden" value={booking.id} />
+                <input name="shift_id" type="hidden" value={shiftId} />
+                <input name="action" type="hidden" value="cancel" />
+                <Button size="sm" type="submit" variant="outline">
+                  Cancel shift
+                </Button>
+              </form>
+            ) : null}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }
 
 function StatusMessage({
+  lifecycle,
   selection,
   updated
 }: {
+  lifecycle?: string;
   selection?: string;
   updated?: string;
 }) {
   const message =
     updated === "1"
       ? "Shift updated."
+      : lifecycle
+        ? {
+            cancelled: "Shift cancelled. The professional response was cancelled.",
+            completed: "Shift completed.",
+            failed: "Shift status could not be updated. Try again.",
+            service_required: "Server configuration is required before updating shift status.",
+            unavailable: "That shift status can no longer be updated."
+          }[lifecycle]
       : {
           accepted: "Professional accepted. Other interested responses were declined.",
           failed: "Professional could not be accepted. Try again.",

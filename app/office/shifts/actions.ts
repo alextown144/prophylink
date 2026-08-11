@@ -10,6 +10,7 @@ import type { Database } from "@/lib/supabase/database.types";
 import {
   bookingSelectionSchema,
   dollarsToCents,
+  officeBookingLifecycleSchema,
   shiftPostingSchema,
   shiftUpdateSchema
 } from "@/lib/validation/account";
@@ -312,6 +313,99 @@ export async function acceptInterestedProfessional(formData: FormData) {
   revalidatePath("/professional/shifts");
   revalidatePath("/professional/dashboard");
   redirect(`/office/shifts/${parsed.data.shiftId}?selection=accepted`);
+}
+
+export async function updateBookedShiftLifecycle(formData: FormData) {
+  const user = await requireUser();
+  const parsed = officeBookingLifecycleSchema.safeParse({
+    action: formString(formData, "action"),
+    bookingId: formString(formData, "booking_id"),
+    shiftId: formString(formData, "shift_id")
+  });
+
+  if (!parsed.success) {
+    redirect("/office/dashboard");
+  }
+
+  if (!isSupabaseServiceRoleConfigured()) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?lifecycle=service_required`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const organizationId = await getCurrentOrganizationId(supabase, user.id);
+
+  if (!organizationId) {
+    redirect("/office/dashboard");
+  }
+
+  const { data } = await supabase
+    .from("bookings")
+    .select("id, shift_id, organization_id, status")
+    .eq("id", parsed.data.bookingId)
+    .eq("shift_id", parsed.data.shiftId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  const booking = data as BookingSelection | null;
+  const completes = parsed.data.action === "complete";
+
+  if (
+    !booking ||
+    (completes && booking.status !== "confirmed") ||
+    (!completes && !["accepted", "confirmed"].includes(booking.status))
+  ) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?lifecycle=unavailable`);
+  }
+
+  const admin = createSupabaseAdminClient();
+  const now = new Date().toISOString();
+  const bookingUpdate = completes
+    ? {
+        completed_at: now,
+        status: "completed",
+        updated_at: now
+      }
+    : {
+        cancelled_reason: "Cancelled by office",
+        status: "cancelled",
+        updated_at: now
+      };
+  const shiftUpdate = {
+    status: completes ? "completed" : "cancelled",
+    updated_at: now
+  };
+
+  const { error } = await admin
+    .from("bookings")
+    .update(bookingUpdate as never)
+    .eq("id", booking.id);
+
+  if (error) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?lifecycle=failed`);
+  }
+
+  await admin
+    .from("shifts")
+    .update(shiftUpdate as never)
+    .eq("id", parsed.data.shiftId)
+    .eq("organization_id", organizationId);
+
+  const eventPayload: BookingEventInsert = {
+    booking_id: booking.id,
+    actor_user_id: user.id,
+    event_type: completes ? "office_completed_shift" : "office_cancelled_shift",
+    metadata: { shift_id: parsed.data.shiftId }
+  };
+
+  await admin.from("booking_events").insert([eventPayload] as never[]);
+
+  revalidatePath("/office/dashboard");
+  revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
+  revalidatePath("/professional/shifts");
+  revalidatePath("/professional/dashboard");
+  redirect(
+    `/office/shifts/${parsed.data.shiftId}?lifecycle=${completes ? "completed" : "cancelled"}`
+  );
 }
 
 function getShiftFormInput(formData: FormData) {

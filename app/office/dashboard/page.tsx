@@ -52,6 +52,10 @@ type PostedShift = {
   starts_at: string;
   ends_at: string;
   hourly_rate_cents: number | null;
+  selected_booking: {
+    professional_name: string;
+    status: string;
+  } | null;
   interested_count: number;
   office_locations: {
     name: string | null;
@@ -284,51 +288,80 @@ async function getOfficeDashboardData(userId: string) {
 
   const [organizationResult, locationsResult, shiftsResult, bookingsResult] =
     await Promise.all([
-    supabase
-      .from("organizations")
-      .select("id, name, primary_email, primary_phone, website")
-      .eq("id", organizationId)
-      .maybeSingle(),
-    supabase
-      .from("office_locations")
-      .select(
-        "id, name, address_line1, city, state, postal_code, phone, contact_name, contact_email, software_used"
-      )
-      .eq("organization_id", organizationId)
-      .order("name", { ascending: true }),
-    supabase
-      .from("shifts")
-      .select(
-        "id, status, starts_at, ends_at, hourly_rate_cents, office_locations(name, city, state), professional_roles(name)"
-      )
-      .eq("organization_id", organizationId)
-      .order("starts_at", { ascending: true })
-      .limit(6),
-    supabase
-      .from("bookings")
-      .select("shift_id, status")
-      .eq("organization_id", organizationId)
-  ]);
+      supabase
+        .from("organizations")
+        .select("id, name, primary_email, primary_phone, website")
+        .eq("id", organizationId)
+        .maybeSingle(),
+      supabase
+        .from("office_locations")
+        .select(
+          "id, name, address_line1, city, state, postal_code, phone, contact_name, contact_email, software_used"
+        )
+        .eq("organization_id", organizationId)
+        .order("name", { ascending: true }),
+      supabase
+        .from("shifts")
+        .select(
+          "id, status, starts_at, ends_at, hourly_rate_cents, office_locations(name, city, state), professional_roles(name)"
+        )
+        .eq("organization_id", organizationId)
+        .order("starts_at", { ascending: true })
+        .limit(6),
+      supabase
+        .from("bookings")
+        .select("shift_id, status, professional_profiles(user_profiles(display_name, email))")
+        .eq("organization_id", organizationId)
+    ]);
   const interestCountByShiftId = new Map<string, number>();
+  const selectedBookingByShiftId = new Map<
+    string,
+    { professional_name: string; status: string }
+  >();
 
-  ((bookingsResult.data ?? []) as { shift_id: string | null; status: string }[]).forEach(
-    (booking) => {
-      if (!booking.shift_id || booking.status !== "interested") {
-        return;
-      }
+  (
+    (bookingsResult.data ?? []) as {
+      professional_profiles: {
+        user_profiles: {
+          display_name: string | null;
+          email: string;
+        } | null;
+      } | null;
+      shift_id: string | null;
+      status: string;
+    }[]
+  ).forEach((booking) => {
+    if (!booking.shift_id) {
+      return;
+    }
 
+    if (booking.status === "interested") {
       interestCountByShiftId.set(
         booking.shift_id,
         (interestCountByShiftId.get(booking.shift_id) ?? 0) + 1
       );
+      return;
     }
-  );
-  const shifts = ((shiftsResult.data ?? []) as Omit<PostedShift, "interested_count">[]).map(
-    (shift) => ({
-      ...shift,
-      interested_count: interestCountByShiftId.get(shift.id) ?? 0
-    })
-  );
+
+    if (["accepted", "confirmed", "completed"].includes(booking.status)) {
+      const userProfile = booking.professional_profiles?.user_profiles;
+      selectedBookingByShiftId.set(booking.shift_id, {
+        professional_name:
+          userProfile?.display_name ?? userProfile?.email ?? "Selected professional",
+        status: booking.status
+      });
+    }
+  });
+  const shifts = (
+    (shiftsResult.data ?? []) as Omit<
+      PostedShift,
+      "interested_count" | "selected_booking"
+    >[]
+  ).map((shift) => ({
+    ...shift,
+    interested_count: interestCountByShiftId.get(shift.id) ?? 0,
+    selected_booking: selectedBookingByShiftId.get(shift.id) ?? null
+  }));
 
   return {
     accountRoles: (rolesResult.data ?? []) as AccountRole[],
@@ -401,9 +434,17 @@ function PostedShiftRow({ shift }: { shift: PostedShift }) {
           <span className="text-sm font-semibold text-teal-700">
             {formatRate(shift.hourly_rate_cents)}
           </span>
-          <span className="text-xs font-semibold text-slate-500">
-            {shift.interested_count} interested
-          </span>
+          {shift.interested_count > 0 ? (
+            <span className="text-xs font-semibold text-slate-500">
+              {shift.interested_count} interested
+            </span>
+          ) : null}
+          {shift.selected_booking ? (
+            <span className="max-w-44 text-right text-xs font-semibold text-slate-600">
+              {shift.selected_booking.professional_name} -{" "}
+              {formatStatus(shift.selected_booking.status)}
+            </span>
+          ) : null}
           <div className="flex gap-2">
             <Button asChild size="sm" variant="outline">
               <Link href={`/office/shifts/${shift.id}`}>Review</Link>
@@ -496,7 +537,7 @@ function formatRate(rateCents: number | null) {
   return rateCents ? `$${Math.round(rateCents / 100)}/hr` : "Rate TBD";
 }
 
-function formatStatus(status: PostedShift["status"]) {
+function formatStatus(status: string) {
   return status
     .split("_")
     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
