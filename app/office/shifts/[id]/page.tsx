@@ -14,6 +14,7 @@ import {
   selectAvailableProfessional,
   updateBookedShiftLifecycle
 } from "@/app/office/shifts/actions";
+import { startBookingConversation } from "@/app/messages/actions";
 import { getOfficeOrganizationId } from "@/app/office/shifts/data";
 import {
   availabilityRuleCoversShift,
@@ -486,6 +487,12 @@ function InterestedProfessionalCard({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
+            <form action={startBookingConversation}>
+              <input name="booking_id" type="hidden" value={booking.id} />
+              <Button size="sm" type="submit">
+                Message
+              </Button>
+            </form>
             {canComplete ? (
               <form action={updateBookedShiftLifecycle}>
                 <input name="booking_id" type="hidden" value={booking.id} />

@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   availableProfessionalSelectionSchema,
+  bookingConversationSchema,
   bookingResponseSchema,
   bookingSelectionSchema,
+  messageSendSchema,
   notificationReadStateSchema,
   officeBookingLifecycleSchema,
   shiftInterestSchema,
@@ -166,6 +168,36 @@ describe("notificationReadStateSchema", () => {
     const result = notificationReadStateSchema.safeParse({
       action: "archive",
       notificationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("bookingConversationSchema", () => {
+  it("accepts a booking id for starting a conversation", () => {
+    const result = bookingConversationSchema.safeParse({
+      bookingId: "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+    });
+
+    expect(result.success).toBe(true);
+  });
+});
+
+describe("messageSendSchema", () => {
+  it("accepts a message body and conversation id", () => {
+    const result = messageSendSchema.safeParse({
+      body: "Can you confirm arrival details?",
+      conversationId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects empty message bodies", () => {
+    const result = messageSendSchema.safeParse({
+      body: "   ",
+      conversationId: "dddddddd-dddd-4ddd-8ddd-dddddddddddd"
     });
 
     expect(result.success).toBe(false);

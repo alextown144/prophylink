@@ -114,6 +114,7 @@ async function getNotificationsPageData(userId: string) {
 
 function NotificationRow({ notification }: { notification: Notification }) {
   const targetHref = getNotificationTargetHref(notification);
+  const targetLabel = getNotificationTargetLabel(notification);
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -137,7 +138,7 @@ function NotificationRow({ notification }: { notification: Notification }) {
         <div className="flex shrink-0 flex-wrap gap-2">
           {targetHref ? (
             <Button asChild size="sm">
-              <Link href={targetHref}>Review shift</Link>
+              <Link href={targetHref}>{targetLabel}</Link>
             </Button>
           ) : null}
           <form action={updateNotificationReadState}>
@@ -176,6 +177,11 @@ function StatusMessage({ status }: { status?: string }) {
 
 function getNotificationTargetHref(notification: Notification) {
   const shiftId = getShiftIdFromMetadata(notification.metadata);
+  const conversationId = getConversationIdFromMetadata(notification.metadata);
+
+  if (notification.type === "new_message") {
+    return conversationId ? `/messages/${conversationId}` : "/messages";
+  }
 
   if (["shift_interest", "shift_confirmed", "shift_declined"].includes(notification.type)) {
     return shiftId ? `/office/shifts/${shiftId}` : "/office/dashboard";
@@ -200,6 +206,20 @@ function getShiftIdFromMetadata(metadata: Json) {
   const shiftId = metadata.shift_id;
 
   return typeof shiftId === "string" ? shiftId : null;
+}
+
+function getNotificationTargetLabel(notification: Notification) {
+  return notification.type === "new_message" ? "Open message" : "Review shift";
+}
+
+function getConversationIdFromMetadata(metadata: Json) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const conversationId = metadata.conversation_id;
+
+  return typeof conversationId === "string" ? conversationId : null;
 }
 
 function getDashboardHref(roles: AccountRole[]) {

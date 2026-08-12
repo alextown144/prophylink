@@ -125,6 +125,13 @@ export function DashboardMenu() {
               </span>
             ) : null}
           </Link>
+          <Link
+            className="focus-ring px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"
+            href="/messages"
+          >
+            <span className="block font-semibold text-slate-950">Messages</span>
+            <span className="text-xs text-slate-500">Booking conversations</span>
+          </Link>
           {links.map((link) => (
             <Link
               className="focus-ring px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"

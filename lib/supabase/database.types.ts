@@ -147,6 +147,60 @@ export type Database = {
           updated_at?: string;
         }
       >;
+      conversations: Table<
+        {
+          id: string;
+          shift_id: string | null;
+          booking_id: string | null;
+          coverage_request_id: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          shift_id?: string | null;
+          booking_id?: string | null;
+          coverage_request_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        },
+        {
+          id?: string;
+          shift_id?: string | null;
+          booking_id?: string | null;
+          coverage_request_id?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+      >;
+      conversation_members: Table<
+        {
+          conversation_id: string;
+          user_id: string;
+          created_at: string;
+        },
+        {
+          conversation_id: string;
+          user_id: string;
+          created_at?: string;
+        }
+      >;
+      messages: Table<
+        {
+          id: string;
+          conversation_id: string;
+          sender_user_id: string;
+          body: string;
+          created_at: string;
+        },
+        {
+          id?: string;
+          conversation_id: string;
+          sender_user_id: string;
+          body: string;
+          created_at?: string;
+        }
+      >;
       office_locations: Table<
         {
           id: string;

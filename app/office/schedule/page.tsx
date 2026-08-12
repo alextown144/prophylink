@@ -1,5 +1,6 @@
 import { ArrowLeft, CalendarDays, Clock, MapPin, UserRound } from "lucide-react";
 import Link from "next/link";
+import { startBookingConversation } from "@/app/messages/actions";
 import { getOfficeOrganizationId } from "@/app/office/shifts/data";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -74,6 +75,9 @@ export default async function OfficeSchedulePage() {
         <div className="flex flex-wrap gap-3">
           <Button asChild>
             <Link href="/office/shifts/new">Post a shift</Link>
+          </Button>
+          <Button asChild variant="outline">
+            <Link href="/messages">Messages</Link>
           </Button>
           <Button asChild variant="outline">
             <Link href="/office/dashboard">Posted shifts</Link>
@@ -199,6 +203,14 @@ function OfficeScheduleBookingCard({
           <Button asChild size="sm" variant="outline">
             <Link href={`/office/shifts/${booking.shift_id}`}>Review</Link>
           </Button>
+        ) : null}
+        {["accepted", "confirmed"].includes(booking.status) ? (
+          <form action={startBookingConversation}>
+            <input name="booking_id" type="hidden" value={booking.id} />
+            <Button size="sm" type="submit">
+              Message
+            </Button>
+          </form>
         ) : null}
       </div>
       <div className="mt-3 grid gap-2 text-sm text-slate-600">

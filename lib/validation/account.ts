@@ -115,6 +115,15 @@ export const notificationReadStateSchema = z.object({
   notificationId: z.string().uuid()
 });
 
+export const bookingConversationSchema = z.object({
+  bookingId: z.string().uuid()
+});
+
+export const messageSendSchema = z.object({
+  body: z.string().trim().min(1).max(2000),
+  conversationId: z.string().uuid()
+});
+
 export const createInvitationSchema = z.object({
   email: z.string().email(),
   accountKind: accountKindSchema,
