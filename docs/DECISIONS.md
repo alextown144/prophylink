@@ -59,3 +59,9 @@ Reason: Invite-only beta should be enforceable by backend logic while still allo
 Decision: Validate signup invitations and persist profile, role, organization, and location foundation records through server actions using the Supabase service role.
 
 Reason: Invite validation and account bootstrap cannot rely on browser-only checks, and onboarding should create consistent records even when email confirmation changes session behavior.
+
+## 2026-08-12: Keep credential files private and admin-reviewed
+
+Decision: Store credential files in a private Supabase Storage bucket named `credentials`, keep credential rows tied to professional profiles, and use admin-generated signed URLs for review. Professionals can insert pending credentials and read their own rows, while admin review is required to mark credentials verified or rejected.
+
+Reason: Credential files are sensitive professional records. Offices need marketplace trust signals, but they do not need direct access to raw credential files in the MVP.

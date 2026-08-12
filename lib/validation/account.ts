@@ -124,6 +124,28 @@ export const messageSendSchema = z.object({
   conversationId: z.string().uuid()
 });
 
+export const credentialUploadSchema = z.object({
+  credentialTypeId: z.string().uuid(),
+  credentialNumber: z.string().trim().max(120).optional(),
+  issuingState: z.string().trim().max(40).optional(),
+  issueDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal("")),
+  expirationDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional().or(z.literal(""))
+});
+
+export const credentialReviewSchema = z
+  .object({
+    action: z.enum(["verify", "reject"]),
+    credentialId: z.string().uuid(),
+    rejectionReason: z.string().trim().max(500).optional()
+  })
+  .refine(
+    (review) => review.action === "verify" || Boolean(review.rejectionReason),
+    {
+      message: "A rejection reason is required.",
+      path: ["rejectionReason"]
+    }
+  );
+
 export const createInvitationSchema = z.object({
   email: z.string().email(),
   accountKind: accountKindSchema,

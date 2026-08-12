@@ -166,6 +166,7 @@ function buildDashboardLinks(roles: AccountKind[]): DashboardLink[] {
     links.push(
       { href: "/admin", label: "Admin dashboard", section: "Beta control center" },
       { href: "/admin/users", label: "Users and invitations", section: "Admin" },
+      { href: "/admin/credentials", label: "Credential review", section: "Admin" },
       { href: "/admin/subscriptions", label: "Subscription gates", section: "Admin" }
     );
   }
@@ -190,6 +191,11 @@ function buildDashboardLinks(roles: AccountKind[]): DashboardLink[] {
       {
         href: "/professional/availability",
         label: "Availability calendar",
+        section: "Professional"
+      },
+      {
+        href: "/professional/credentials",
+        label: "Credentials",
         section: "Professional"
       },
       { href: "/professional/profile", label: "Professional profile", section: "Professional" }

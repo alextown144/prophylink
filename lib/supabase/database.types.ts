@@ -97,6 +97,63 @@ export type Database = {
           created_at?: string;
         }
       >;
+      credential_types: Table<{
+        id: string;
+        slug: string;
+        name: string;
+        requires_expiration: boolean;
+        created_at: string;
+      }>;
+      professional_credentials: Table<
+        {
+          id: string;
+          professional_profile_id: string;
+          credential_type_id: string;
+          credential_number: string | null;
+          issuing_state: string | null;
+          issue_date: string | null;
+          expiration_date: string | null;
+          file_path: string | null;
+          status: Database["public"]["Enums"]["credential_status"];
+          rejection_reason: string | null;
+          verified_by: string | null;
+          verified_at: string | null;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          professional_profile_id: string;
+          credential_type_id: string;
+          credential_number?: string | null;
+          issuing_state?: string | null;
+          issue_date?: string | null;
+          expiration_date?: string | null;
+          file_path?: string | null;
+          status?: Database["public"]["Enums"]["credential_status"];
+          rejection_reason?: string | null;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        },
+        {
+          id?: string;
+          professional_profile_id?: string;
+          credential_type_id?: string;
+          credential_number?: string | null;
+          issuing_state?: string | null;
+          issue_date?: string | null;
+          expiration_date?: string | null;
+          file_path?: string | null;
+          status?: Database["public"]["Enums"]["credential_status"];
+          rejection_reason?: string | null;
+          verified_by?: string | null;
+          verified_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        }
+      >;
       bookings: Table<
         {
           id: string;

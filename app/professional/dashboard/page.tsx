@@ -3,6 +3,7 @@ import {
   BadgeCheck,
   Bell,
   CalendarDays,
+  FileText,
   ShieldCheck,
   SlidersHorizontal,
   UserRound
@@ -86,12 +87,21 @@ type NotificationPreview = {
   read_at: string | null;
 };
 
+type CredentialSummary = {
+  id: string;
+  status: "pending" | "verified" | "rejected" | "expired";
+  credential_types: {
+    name: string;
+  } | null;
+};
+
 export default async function ProfessionalDashboardPage() {
   const user = await requireUser();
   const {
     accountRoles,
     availabilityRules,
     bookingSummaries,
+    credentialSummaries,
     notifications,
     profile,
     professionalProfile,
@@ -205,6 +215,10 @@ export default async function ProfessionalDashboardPage() {
             <ChecklistItem complete={Boolean(profile?.city && profile.state)} label="Location saved" />
             <ChecklistItem complete={Boolean(professionalProfile)} label="Profile foundation saved" />
             <ChecklistItem complete={availabilityRules.length > 0} label="Availability saved" />
+            <ChecklistItem
+              complete={credentialSummaries.some((credential) => credential.status === "verified")}
+              label="Verified credential on file"
+            />
             <NextStep
               href="/professional/shifts"
               label={
@@ -227,6 +241,11 @@ export default async function ProfessionalDashboardPage() {
               href="/professional/profile"
               label="Update profile foundation"
               text="Change your public-safe bio, rate, radius, or location."
+            />
+            <NextStep
+              href="/professional/credentials"
+              label="Upload credentials"
+              text="Submit license or certification documentation for admin review."
             />
             <NextStep
               href="/admin/users"
@@ -320,11 +339,37 @@ export default async function ProfessionalDashboardPage() {
           </CardContent>
         </Card>
 
-        <FutureCard
-          icon={<ShieldCheck className="h-5 w-5" />}
-          title="Credentials"
-          text="Credential uploads and review remain intentionally deferred."
-        />
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <FileText className="h-5 w-5 text-teal-700" />
+              Credentials
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {credentialSummaries.length > 0 ? (
+              credentialSummaries.slice(0, 4).map((credential) => (
+                <div className="rounded-lg border bg-white p-4" key={credential.id}>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="font-semibold text-slate-950">
+                      {credential.credential_types?.name ?? "Credential"}
+                    </p>
+                    <Badge variant={credential.status === "verified" ? "default" : "outline"}>
+                      {formatStatus(credential.status)}
+                    </Badge>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+                No credentials submitted yet.
+              </p>
+            )}
+            <Button asChild variant="outline">
+              <Link href="/professional/credentials">Manage credentials</Link>
+            </Button>
+          </CardContent>
+        </Card>
         <FutureCard
           icon={<ArrowRight className="h-5 w-5" />}
           title="Matching workflow"
@@ -376,9 +421,10 @@ async function getProfessionalDashboardData(userId: string) {
 
   let availabilityRules: AvailabilityRule[] = [];
   let bookingSummaries: BookingSummary[] = [];
+  let credentialSummaries: CredentialSummary[] = [];
 
   if (professionalProfile?.id) {
-    const [availabilityResult, bookingResult] = await Promise.all([
+    const [availabilityResult, bookingResult, credentialResult] = await Promise.all([
       supabase
         .from("availability_rules")
         .select(
@@ -392,16 +438,24 @@ async function getProfessionalDashboardData(userId: string) {
         .select("id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at")
         .eq("professional_profile_id", professionalProfile.id)
         .order("created_at", { ascending: false })
+        .limit(6),
+      supabase
+        .from("professional_credentials")
+        .select("id, status, credential_types(name)")
+        .eq("professional_profile_id", professionalProfile.id)
+        .order("created_at", { ascending: false })
         .limit(6)
     ]);
     availabilityRules = (availabilityResult.data ?? []) as AvailabilityRule[];
     bookingSummaries = (bookingResult.data ?? []) as BookingSummary[];
+    credentialSummaries = (credentialResult.data ?? []) as CredentialSummary[];
   }
 
   return {
     accountRoles: (rolesResult.data ?? []) as AccountRole[],
     availabilityRules,
     bookingSummaries,
+    credentialSummaries,
     notifications: (notificationsResult.data ?? []) as NotificationPreview[],
     profile: profileResult.data as UserProfile | null,
     professionalProfile,

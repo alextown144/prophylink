@@ -5,6 +5,7 @@ import {
   ClipboardList,
   Mail,
   Settings,
+  ShieldCheck,
   UserPlus,
   UsersRound
 } from "lucide-react";
@@ -28,7 +29,7 @@ type InvitationRow = {
 
 export default async function AdminDashboardPage() {
   await requireAdmin();
-  const { activeInvites, adminRoles, officeRoles, professionalRoles, recentInvites, users } =
+  const { activeInvites, adminRoles, officeRoles, pendingCredentials, professionalRoles, recentInvites, users } =
     await getAdminOverview();
 
   return (
@@ -59,7 +60,7 @@ export default async function AdminDashboardPage() {
         </div>
       </div>
 
-      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
         <MetricCard icon={UsersRound} label="Total users" value={String(users)} />
         <MetricCard
           icon={BadgeCheck}
@@ -72,6 +73,11 @@ export default async function AdminDashboardPage() {
           value={String(officeRoles)}
         />
         <MetricCard icon={Mail} label="Active invites" value={String(activeInvites)} />
+        <MetricCard
+          icon={ShieldCheck}
+          label="Pending credentials"
+          value={String(pendingCredentials)}
+        />
       </section>
 
       <section className="mt-6 grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -96,6 +102,11 @@ export default async function AdminDashboardPage() {
               href="/admin/users"
               label="Create an office test invite"
               text="Use a different email to test organization and location setup."
+            />
+            <AdminAction
+              href="/admin/credentials"
+              label="Review pending credentials"
+              text="Verify or reject uploaded professional credentials for beta trust checks."
             />
             <AdminAction
               href="/admin/subscriptions"
@@ -165,6 +176,7 @@ async function getAdminOverview() {
     officeRolesResult,
     adminRolesResult,
     activeInvitesResult,
+    pendingCredentialsResult,
     invitationsResult
   ] = await Promise.all([
     supabase.from("user_profiles").select("id", { count: "exact", head: true }),
@@ -185,6 +197,10 @@ async function getAdminOverview() {
       .select("id", { count: "exact", head: true })
       .eq("status", "active"),
     supabase
+      .from("professional_credentials")
+      .select("id", { count: "exact", head: true })
+      .eq("status", "pending"),
+    supabase
       .from("signup_invitations")
       .select("id, email, account_kind, status, expires_at, created_at")
       .order("created_at", { ascending: false })
@@ -195,6 +211,7 @@ async function getAdminOverview() {
     activeInvites: activeInvitesResult.count ?? 0,
     adminRoles: adminRolesResult.count ?? 0,
     officeRoles: officeRolesResult.count ?? 0,
+    pendingCredentials: pendingCredentialsResult.count ?? 0,
     professionalRoles: professionalRolesResult.count ?? 0,
     recentInvites: (invitationsResult.data ?? []) as InvitationRow[],
     users: usersResult.count ?? 0
