@@ -104,6 +104,11 @@ export default async function AdminDashboardPage() {
               text="Use a different email to test organization and location setup."
             />
             <AdminAction
+              href="/admin/marketplace"
+              label="Review marketplace activity"
+              text="Check posted shifts, bookings, messages, and notifications from one read-only view."
+            />
+            <AdminAction
               href="/admin/credentials"
               label="Review pending credentials"
               text="Verify or reject uploaded professional credentials for beta trust checks."

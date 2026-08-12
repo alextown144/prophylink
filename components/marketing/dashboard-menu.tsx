@@ -166,6 +166,7 @@ function buildDashboardLinks(roles: AccountKind[]): DashboardLink[] {
     links.push(
       { href: "/admin", label: "Admin dashboard", section: "Beta control center" },
       { href: "/admin/users", label: "Users and invitations", section: "Admin" },
+      { href: "/admin/marketplace", label: "Marketplace activity", section: "Admin" },
       { href: "/admin/credentials", label: "Credential review", section: "Admin" },
       { href: "/admin/subscriptions", label: "Subscription gates", section: "Admin" }
     );
