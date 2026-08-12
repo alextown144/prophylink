@@ -8,6 +8,7 @@ import {
 } from "@/lib/availability";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
+import { createNotificationForUser } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -31,7 +32,6 @@ type OrganizationMembership = {
 
 type BookingEventInsert = Database["public"]["Tables"]["booking_events"]["Insert"];
 type BookingInsert = Database["public"]["Tables"]["bookings"]["Insert"];
-type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
 type ShiftInsert = Database["public"]["Tables"]["shifts"]["Insert"];
 type ShiftUpdate = Database["public"]["Tables"]["shifts"]["Update"];
 
@@ -39,6 +39,7 @@ type BookingSelection = {
   id: string;
   shift_id: string | null;
   organization_id: string;
+  professional_profile_id: string;
   status:
     | "invited"
     | "interested"
@@ -49,6 +50,10 @@ type BookingSelection = {
     | "declined"
     | "cancelled"
     | "completed";
+};
+
+type ProfessionalUserRef = {
+  user_id: string;
 };
 
 type ShiftForProfessionalSelection = {
@@ -280,7 +285,7 @@ export async function acceptInterestedProfessional(formData: FormData) {
 
   const { data } = await supabase
     .from("bookings")
-    .select("id, shift_id, organization_id, status")
+    .select("id, shift_id, organization_id, professional_profile_id, status")
     .eq("id", parsed.data.bookingId)
     .eq("shift_id", parsed.data.shiftId)
     .eq("organization_id", organizationId)
@@ -333,11 +338,28 @@ export async function acceptInterestedProfessional(formData: FormData) {
     event_type: "office_accepted_professional",
     metadata: { shift_id: parsed.data.shiftId }
   };
+  const { data: professionalData } = await admin
+    .from("professional_profiles")
+    .select("user_id")
+    .eq("id", booking.professional_profile_id)
+    .maybeSingle();
+  const professional = professionalData as ProfessionalUserRef | null;
 
-  await admin.from("booking_events").insert([eventPayload] as never[]);
+  await Promise.all([
+    admin.from("booking_events").insert([eventPayload] as never[]),
+    professional?.user_id
+      ? createNotificationForUser(admin, professional.user_id, {
+          body: "An office accepted your interest. Confirm or decline the shift from your shift responses.",
+          metadata: { booking_id: booking.id, shift_id: parsed.data.shiftId },
+          title: "Your shift interest was accepted",
+          type: "shift_accepted"
+        })
+      : Promise.resolve()
+  ]);
 
   revalidatePath("/office/dashboard");
   revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
+  revalidatePath("/notifications");
   revalidatePath("/professional/shifts");
   revalidatePath("/professional/dashboard");
   redirect(`/office/shifts/${parsed.data.shiftId}?selection=accepted`);
@@ -471,21 +493,19 @@ export async function selectAvailableProfessional(formData: FormData) {
     event_type: "office_selected_available_professional",
     metadata: { shift_id: shift.id }
   };
-  const notificationPayload: NotificationInsert = {
-    body: "An office selected you for a shift. Confirm or decline it from your shift responses.",
-    metadata: { booking_id: booking.id, shift_id: shift.id },
-    title: "You were selected for a shift",
-    type: "shift_selected",
-    user_id: professional.user_id
-  };
-
   await Promise.all([
     admin.from("booking_events").insert([eventPayload] as never[]),
-    admin.from("notifications").insert([notificationPayload] as never[])
+    createNotificationForUser(admin, professional.user_id, {
+      body: "An office selected you for a shift. Confirm or decline it from your shift responses.",
+      metadata: { booking_id: booking.id, shift_id: shift.id },
+      title: "You were selected for a shift",
+      type: "shift_selected"
+    })
   ]);
 
   revalidatePath("/office/dashboard");
   revalidatePath(`/office/shifts/${shift.id}`);
+  revalidatePath("/notifications");
   revalidatePath("/professional/shifts");
   revalidatePath("/professional/dashboard");
   redirect(`/office/shifts/${shift.id}?selection=selected`);
@@ -516,7 +536,7 @@ export async function updateBookedShiftLifecycle(formData: FormData) {
 
   const { data } = await supabase
     .from("bookings")
-    .select("id, shift_id, organization_id, status")
+    .select("id, shift_id, organization_id, professional_profile_id, status")
     .eq("id", parsed.data.bookingId)
     .eq("shift_id", parsed.data.shiftId)
     .eq("organization_id", organizationId)
@@ -572,11 +592,30 @@ export async function updateBookedShiftLifecycle(formData: FormData) {
     event_type: completes ? "office_completed_shift" : "office_cancelled_shift",
     metadata: { shift_id: parsed.data.shiftId }
   };
+  const { data: professionalData } = await admin
+    .from("professional_profiles")
+    .select("user_id")
+    .eq("id", booking.professional_profile_id)
+    .maybeSingle();
+  const professional = professionalData as ProfessionalUserRef | null;
 
-  await admin.from("booking_events").insert([eventPayload] as never[]);
+  await Promise.all([
+    admin.from("booking_events").insert([eventPayload] as never[]),
+    professional?.user_id
+      ? createNotificationForUser(admin, professional.user_id, {
+          body: completes
+            ? "Your office marked this shift completed."
+            : "Your office cancelled this shift.",
+          metadata: { booking_id: booking.id, shift_id: parsed.data.shiftId },
+          title: completes ? "Shift marked completed" : "Shift cancelled",
+          type: completes ? "shift_completed" : "shift_cancelled"
+        })
+      : Promise.resolve()
+  ]);
 
   revalidatePath("/office/dashboard");
   revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
+  revalidatePath("/notifications");
   revalidatePath("/professional/shifts");
   revalidatePath("/professional/dashboard");
   redirect(

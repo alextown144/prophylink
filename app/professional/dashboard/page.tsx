@@ -469,7 +469,9 @@ function NotificationCard({ notification }: { notification: NotificationPreview 
       <p className="mt-2 text-xs font-semibold text-slate-500">
         {formatNotificationDate(notification.created_at)}
       </p>
-      {notification.type === "shift_selected" ? (
+      {["shift_accepted", "shift_selected", "shift_cancelled", "shift_completed"].includes(
+        notification.type
+      ) ? (
         <Button asChild className="mt-4" size="sm">
           <Link href="/professional/shifts">Review shift</Link>
         </Button>

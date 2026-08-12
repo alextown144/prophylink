@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
+import { createNotificationsForOrganization } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
@@ -22,6 +23,7 @@ type ProfessionalProfileRef = {
 type BookingRef = {
   id: string;
   shift_id: string | null;
+  organization_id: string;
   status:
     | "invited"
     | "interested"
@@ -130,11 +132,21 @@ export async function expressInterestInShift(formData: FormData) {
     metadata: { shift_id: shift.id }
   };
 
-  await admin.from("booking_events").insert([eventPayload] as never[]);
+  await Promise.all([
+    admin.from("booking_events").insert([eventPayload] as never[]),
+    createNotificationsForOrganization(admin, shift.organization_id, {
+      body: "A professional is interested in one of your open shifts. Review their profile from the shift details page.",
+      metadata: { booking_id: booking.id, shift_id: shift.id },
+      title: "New professional interest",
+      type: "shift_interest"
+    })
+  ]);
 
   revalidatePath("/professional/shifts");
   revalidatePath("/professional/dashboard");
+  revalidatePath("/notifications");
   revalidatePath("/office/dashboard");
+  revalidatePath(`/office/shifts/${shift.id}`);
   redirect("/professional/shifts?interest=sent");
 }
 
@@ -169,7 +181,7 @@ export async function respondToAcceptedShift(formData: FormData) {
 
   const { data: bookingData } = await supabase
     .from("bookings")
-    .select("id, shift_id, status")
+    .select("id, shift_id, organization_id, status")
     .eq("id", parsed.data.bookingId)
     .eq("shift_id", parsed.data.shiftId)
     .eq("professional_profile_id", professionalProfileRef.id)
@@ -212,10 +224,21 @@ export async function respondToAcceptedShift(formData: FormData) {
     metadata: { shift_id: parsed.data.shiftId }
   };
 
-  await admin.from("booking_events").insert([eventPayload] as never[]);
+  await Promise.all([
+    admin.from("booking_events").insert([eventPayload] as never[]),
+    createNotificationsForOrganization(admin, booking.organization_id, {
+      body: confirms
+        ? "A professional confirmed the shift. The shift is now filled."
+        : "A professional declined the shift. The posting was reopened for more responses.",
+      metadata: { booking_id: booking.id, shift_id: parsed.data.shiftId },
+      title: confirms ? "Professional confirmed shift" : "Professional declined shift",
+      type: confirms ? "shift_confirmed" : "shift_declined"
+    })
+  ]);
 
   revalidatePath("/professional/shifts");
   revalidatePath("/professional/dashboard");
+  revalidatePath("/notifications");
   revalidatePath("/office/dashboard");
   revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
   redirect(`/professional/shifts?response=${confirms ? "confirmed" : "declined"}`);

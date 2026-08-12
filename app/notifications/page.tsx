@@ -175,11 +175,31 @@ function StatusMessage({ status }: { status?: string }) {
 }
 
 function getNotificationTargetHref(notification: Notification) {
-  if (notification.type === "shift_selected") {
+  const shiftId = getShiftIdFromMetadata(notification.metadata);
+
+  if (["shift_interest", "shift_confirmed", "shift_declined"].includes(notification.type)) {
+    return shiftId ? `/office/shifts/${shiftId}` : "/office/dashboard";
+  }
+
+  if (
+    ["shift_accepted", "shift_selected", "shift_cancelled", "shift_completed"].includes(
+      notification.type
+    )
+  ) {
     return "/professional/shifts";
   }
 
   return null;
+}
+
+function getShiftIdFromMetadata(metadata: Json) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata)) {
+    return null;
+  }
+
+  const shiftId = metadata.shift_id;
+
+  return typeof shiftId === "string" ? shiftId : null;
 }
 
 function getDashboardHref(roles: AccountRole[]) {
