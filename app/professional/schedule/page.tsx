@@ -3,6 +3,8 @@ import Link from "next/link";
 import { startBookingConversation } from "@/app/messages/actions";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatBookingStatus, getBookingNextAction } from "@/lib/booking-status";
+import { BookingStatusTimeline } from "@/components/booking/booking-status-timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +15,10 @@ type ProfessionalProfile = {
 
 type ScheduleBooking = {
   id: string;
+  cancelled_reason: string | null;
+  completed_at: string | null;
+  confirmed_at: string | null;
+  created_at: string;
   status:
     | "invited"
     | "interested"
@@ -156,7 +162,7 @@ async function getProfessionalScheduleData(userId: string) {
   const { data } = await supabase
     .from("bookings")
     .select(
-      "id, status, agreed_starts_at, agreed_ends_at, agreed_hourly_rate_cents, organizations(name), office_locations(name, address_line1, city, state, postal_code), professional_roles(name)"
+      "id, cancelled_reason, completed_at, confirmed_at, created_at, status, agreed_starts_at, agreed_ends_at, agreed_hourly_rate_cents, organizations(name), office_locations(name, address_line1, city, state, postal_code), professional_roles(name)"
     )
     .eq("professional_profile_id", professionalProfile.id)
     .gte("agreed_ends_at", new Date().toISOString())
@@ -176,13 +182,15 @@ function ScheduleBookingCard({
   booking: ScheduleBooking;
   compact?: boolean;
 }) {
+  const canMessage = ["accepted", "confirmed"].includes(booking.status);
+
   return (
     <div className="rounded-lg border bg-white p-4">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={booking.status === "confirmed" ? "default" : "outline"}>
-              {formatStatus(booking.status)}
+              {formatBookingStatus(booking.status)}
             </Badge>
             <span className="text-sm font-semibold text-teal-700">
               {formatRate(booking.agreed_hourly_rate_cents)}
@@ -192,17 +200,19 @@ function ScheduleBookingCard({
             {booking.organizations?.name ?? "Dental office"}
           </h2>
         </div>
-        <Button asChild size="sm" variant="outline">
-          <Link href="/professional/shifts">Review</Link>
-        </Button>
-        {["accepted", "confirmed"].includes(booking.status) ? (
-          <form action={startBookingConversation}>
-            <input name="booking_id" type="hidden" value={booking.id} />
-            <Button size="sm" type="submit">
-              Message
-            </Button>
-          </form>
-        ) : null}
+        <div className="flex flex-wrap gap-2">
+          <Button asChild size="sm" variant="outline">
+            <Link href="/professional/shifts">Review</Link>
+          </Button>
+          {canMessage ? (
+            <form action={startBookingConversation}>
+              <input name="booking_id" type="hidden" value={booking.id} />
+              <Button size="sm" type="submit">
+                Message
+              </Button>
+            </form>
+          ) : null}
+        </div>
       </div>
       <div className="mt-3 grid gap-2 text-sm text-slate-600">
         <IconFact icon={<CalendarDays className="h-4 w-4" />} text={formatShiftDate(booking.agreed_starts_at)} />
@@ -217,6 +227,13 @@ function ScheduleBookingCard({
           />
         ) : null}
       </div>
+      {compact ? (
+        <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+          {getBookingNextAction(booking.status, "professional")}
+        </p>
+      ) : (
+        <BookingStatusTimeline audience="professional" booking={booking} className="mt-4" />
+      )}
     </div>
   );
 }
@@ -268,11 +285,4 @@ function formatShiftTime(startsAt: string, endsAt: string) {
   });
 
   return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
-}
-
-function formatStatus(status: ScheduleBooking["status"]) {
-  return status
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }

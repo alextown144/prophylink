@@ -4,6 +4,8 @@ import { startBookingConversation } from "@/app/messages/actions";
 import { getOfficeOrganizationId } from "@/app/office/shifts/data";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatBookingStatus, getBookingNextAction } from "@/lib/booking-status";
+import { BookingStatusTimeline } from "@/components/booking/booking-status-timeline";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,6 +13,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 type OfficeScheduleBooking = {
   id: string;
   shift_id: string | null;
+  cancelled_reason: string | null;
+  completed_at: string | null;
+  confirmed_at: string | null;
+  created_at: string;
   status:
     | "invited"
     | "interested"
@@ -157,7 +163,7 @@ async function getOfficeScheduleData(userId: string) {
   const { data } = await supabase
     .from("bookings")
     .select(
-      "id, shift_id, status, agreed_starts_at, agreed_ends_at, agreed_hourly_rate_cents, office_locations(name, address_line1, city, state, postal_code), professional_profiles(user_profiles(display_name, email), professional_roles(name))"
+      "id, shift_id, cancelled_reason, completed_at, confirmed_at, created_at, status, agreed_starts_at, agreed_ends_at, agreed_hourly_rate_cents, office_locations(name, address_line1, city, state, postal_code), professional_profiles(user_profiles(display_name, email), professional_roles(name))"
     )
     .eq("organization_id", organizationId)
     .in("status", ["accepted", "confirmed", "completed", "cancelled", "declined"])
@@ -176,6 +182,7 @@ function OfficeScheduleBookingCard({
 }) {
   const profile = booking.professional_profiles;
   const userProfile = profile?.user_profiles;
+  const canMessage = ["accepted", "confirmed"].includes(booking.status);
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -183,7 +190,7 @@ function OfficeScheduleBookingCard({
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={booking.status === "confirmed" ? "default" : "outline"}>
-              {formatStatus(booking.status)}
+              {formatBookingStatus(booking.status)}
             </Badge>
             <span className="text-sm font-semibold text-teal-700">
               {formatRate(booking.agreed_hourly_rate_cents)}
@@ -199,19 +206,21 @@ function OfficeScheduleBookingCard({
             </p>
           ) : null}
         </div>
-        {booking.shift_id ? (
-          <Button asChild size="sm" variant="outline">
-            <Link href={`/office/shifts/${booking.shift_id}`}>Review</Link>
-          </Button>
-        ) : null}
-        {["accepted", "confirmed"].includes(booking.status) ? (
-          <form action={startBookingConversation}>
-            <input name="booking_id" type="hidden" value={booking.id} />
-            <Button size="sm" type="submit">
-              Message
+        <div className="flex flex-wrap gap-2">
+          {booking.shift_id ? (
+            <Button asChild size="sm" variant="outline">
+              <Link href={`/office/shifts/${booking.shift_id}`}>Review</Link>
             </Button>
-          </form>
-        ) : null}
+          ) : null}
+          {canMessage ? (
+            <form action={startBookingConversation}>
+              <input name="booking_id" type="hidden" value={booking.id} />
+              <Button size="sm" type="submit">
+                Message
+              </Button>
+            </form>
+          ) : null}
+        </div>
       </div>
       <div className="mt-3 grid gap-2 text-sm text-slate-600">
         <IconFact icon={<CalendarDays className="h-4 w-4" />} text={formatShiftDate(booking.agreed_starts_at)} />
@@ -226,6 +235,13 @@ function OfficeScheduleBookingCard({
           />
         ) : null}
       </div>
+      {compact ? (
+        <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+          {getBookingNextAction(booking.status, "office")}
+        </p>
+      ) : (
+        <BookingStatusTimeline audience="office" booking={booking} className="mt-4" />
+      )}
     </div>
   );
 }
@@ -277,11 +293,4 @@ function formatShiftTime(startsAt: string, endsAt: string) {
   });
 
   return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
-}
-
-function formatStatus(status: OfficeScheduleBooking["status"]) {
-  return status
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }

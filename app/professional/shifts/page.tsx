@@ -8,9 +8,11 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
+import { startBookingConversation } from "@/app/messages/actions";
 import { hasBlockingBookingConflict } from "@/lib/booking-conflicts";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { formatBookingStatus, getBookingNextAction } from "@/lib/booking-status";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -60,6 +62,10 @@ type OpenShiftWithConflict = OpenShift & {
 type BookingInterest = {
   id: string;
   shift_id: string | null;
+  cancelled_reason?: string | null;
+  completed_at?: string | null;
+  confirmed_at?: string | null;
+  created_at?: string | null;
   agreed_hourly_rate_cents?: number | null;
   agreed_starts_at?: string;
   agreed_ends_at?: string;
@@ -202,10 +208,10 @@ async function getShiftBoardData(userId: string) {
       .order("starts_at", { ascending: true })
       .limit(20),
     professionalProfile
-      ? supabase
+        ? supabase
           .from("bookings")
           .select(
-            "id, shift_id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at"
+            "id, shift_id, cancelled_reason, completed_at, confirmed_at, created_at, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at"
           )
           .eq("professional_profile_id", professionalProfile.id)
           .order("created_at", { ascending: false })
@@ -242,46 +248,65 @@ async function getShiftBoardData(userId: string) {
 }
 
 function ResponseRow({ booking }: { booking: BookingInterest }) {
+  const canMessage = ["accepted", "confirmed"].includes(booking.status);
+
   return (
-    <div className="flex flex-col justify-between gap-3 rounded-lg border bg-white p-4 sm:flex-row sm:items-center">
-      <div>
-        <p className="font-semibold text-slate-950">
-          {booking.agreed_starts_at && booking.agreed_ends_at
-            ? formatShiftTime(booking.agreed_starts_at, booking.agreed_ends_at)
-            : "Shift response"}
-        </p>
-        {booking.agreed_starts_at ? (
-          <p className="mt-1 text-sm text-slate-600">
-            {formatShiftDate(booking.agreed_starts_at)}
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+        <div>
+          <p className="font-semibold text-slate-950">
+            {booking.agreed_starts_at && booking.agreed_ends_at
+              ? formatShiftTime(booking.agreed_starts_at, booking.agreed_ends_at)
+              : "Shift response"}
           </p>
-        ) : null}
+          {booking.agreed_starts_at ? (
+            <p className="mt-1 text-sm text-slate-600">
+              {formatShiftDate(booking.agreed_starts_at)}
+            </p>
+          ) : null}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant={booking.status === "accepted" ? "default" : "outline"}>
+            {formatBookingStatus(booking.status)}
+          </Badge>
+          <span className="text-sm font-semibold text-teal-700">
+            {formatRate(booking.agreed_hourly_rate_cents ?? null)}
+          </span>
+        </div>
       </div>
-      <div className="flex items-center gap-2">
-        <Badge variant={booking.status === "accepted" ? "default" : "outline"}>
-          {formatStatus(booking.status)}
-        </Badge>
-        <span className="text-sm font-semibold text-teal-700">
-          {formatRate(booking.agreed_hourly_rate_cents ?? null)}
-        </span>
-      </div>
-      {booking.status === "accepted" && booking.shift_id ? (
-        <div className="mt-3 flex flex-wrap gap-2 sm:mt-0">
-          <form action={respondToAcceptedShift}>
-            <input name="booking_id" type="hidden" value={booking.id} />
-            <input name="shift_id" type="hidden" value={booking.shift_id} />
-            <input name="action" type="hidden" value="confirm" />
-            <Button size="sm" type="submit">
-              Confirm shift
-            </Button>
-          </form>
-          <form action={respondToAcceptedShift}>
-            <input name="booking_id" type="hidden" value={booking.id} />
-            <input name="shift_id" type="hidden" value={booking.shift_id} />
-            <input name="action" type="hidden" value="decline" />
-            <Button size="sm" type="submit" variant="outline">
-              Decline
-            </Button>
-          </form>
+      <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-600">
+        {getBookingNextAction(booking.status, "professional")}
+      </p>
+      {booking.shift_id && (booking.status === "accepted" || canMessage) ? (
+        <div className="mt-3 flex flex-wrap gap-2">
+          {booking.status === "accepted" ? (
+            <>
+              <form action={respondToAcceptedShift}>
+                <input name="booking_id" type="hidden" value={booking.id} />
+                <input name="shift_id" type="hidden" value={booking.shift_id} />
+                <input name="action" type="hidden" value="confirm" />
+                <Button size="sm" type="submit">
+                  Confirm shift
+                </Button>
+              </form>
+              <form action={respondToAcceptedShift}>
+                <input name="booking_id" type="hidden" value={booking.id} />
+                <input name="shift_id" type="hidden" value={booking.shift_id} />
+                <input name="action" type="hidden" value="decline" />
+                <Button size="sm" type="submit" variant="outline">
+                  Decline
+                </Button>
+              </form>
+            </>
+          ) : null}
+          {canMessage ? (
+            <form action={startBookingConversation}>
+              <input name="booking_id" type="hidden" value={booking.id} />
+              <Button size="sm" type="submit" variant="outline">
+                Message office
+              </Button>
+            </form>
+          ) : null}
         </div>
       ) : null}
     </div>
@@ -356,7 +381,7 @@ function ShiftCard({
                   Interest sent
                 </p>
                 <p className="mt-1 text-sm text-slate-600">
-                  Status: {formatStatus(booking.status)}
+                  Status: {formatBookingStatus(booking.status)}
                 </p>
               </div>
             ) : (
@@ -477,11 +502,4 @@ function formatAddress(shift: OpenShift) {
 
 function formatRate(rateCents: number | null) {
   return rateCents ? `$${Math.round(rateCents / 100)}/hr` : "Rate TBD";
-}
-
-function formatStatus(status: BookingInterest["status"]) {
-  return status
-    .split("_")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
 }

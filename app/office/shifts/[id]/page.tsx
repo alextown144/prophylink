@@ -30,6 +30,7 @@ import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import type { Database } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
+import { BookingStatusTimeline } from "@/components/booking/booking-status-timeline";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -465,6 +466,7 @@ function InterestedProfessionalCard({
           <p className="mt-1 text-sm leading-6 text-slate-600">{profile.short_bio}</p>
         </div>
       ) : null}
+      <BookingStatusTimeline audience="office" booking={booking} className="mt-4" />
       {canAccept ? (
         <form action={acceptInterestedProfessional} className="mt-4">
           <input name="booking_id" type="hidden" value={booking.id} />
