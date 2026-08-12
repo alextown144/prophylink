@@ -207,11 +207,34 @@ export type Database = {
           website?: string | null;
         }
       >;
+      notifications: Table<
+        {
+          id: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body: string | null;
+          read_at: string | null;
+          metadata: Json;
+          created_at: string;
+        },
+        {
+          id?: string;
+          user_id: string;
+          type: string;
+          title: string;
+          body?: string | null;
+          read_at?: string | null;
+          metadata?: Json;
+          created_at?: string;
+        }
+      >;
       professional_profiles: Table<
         {
           id: string;
           user_id: string;
           professional_role_id: string;
+          profile_visibility: string;
           short_bio: string | null;
           years_experience: number | null;
           hourly_rate_cents: number | null;
@@ -221,6 +244,7 @@ export type Database = {
           id?: string;
           user_id: string;
           professional_role_id: string;
+          profile_visibility?: string;
           short_bio?: string | null;
           years_experience?: number | null;
           hourly_rate_cents?: number | null;

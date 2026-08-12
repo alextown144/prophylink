@@ -1,6 +1,7 @@
 import {
   ArrowRight,
   BadgeCheck,
+  Bell,
   CalendarDays,
   ShieldCheck,
   SlidersHorizontal,
@@ -76,12 +77,22 @@ type BookingSummary = {
     | "completed";
 };
 
+type NotificationPreview = {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  created_at: string;
+  read_at: string | null;
+};
+
 export default async function ProfessionalDashboardPage() {
   const user = await requireUser();
   const {
     accountRoles,
     availabilityRules,
     bookingSummaries,
+    notifications,
     profile,
     professionalProfile,
     professionalRole
@@ -254,6 +265,29 @@ export default async function ProfessionalDashboardPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
+              <Bell className="h-5 w-5 text-teal-700" />
+              Notifications
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="grid gap-3">
+            {notifications.length > 0 ? (
+              notifications.slice(0, 4).map((notification) => (
+                <NotificationCard key={notification.id} notification={notification} />
+              ))
+            ) : (
+              <div className="rounded-lg bg-slate-50 p-4">
+                <p className="font-semibold text-slate-950">No notifications yet</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Office selections and shift updates will appear here.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
               <CalendarDays className="h-5 w-5 text-teal-700" />
               Availability preview
             </CardTitle>
@@ -295,7 +329,8 @@ export default async function ProfessionalDashboardPage() {
 
 async function getProfessionalDashboardData(userId: string) {
   const supabase = await createSupabaseServerClient();
-  const [profileResult, rolesResult, professionalProfileResult] = await Promise.all([
+  const [profileResult, rolesResult, professionalProfileResult, notificationsResult] =
+    await Promise.all([
     supabase
       .from("user_profiles")
       .select("first_name, last_name, display_name, email, city, state, postal_code")
@@ -311,7 +346,13 @@ async function getProfessionalDashboardData(userId: string) {
         "id, professional_role_id, short_bio, years_experience, hourly_rate_cents, preferred_radius_miles"
       )
       .eq("user_id", userId)
-      .maybeSingle()
+      .maybeSingle(),
+    supabase
+      .from("notifications")
+      .select("id, type, title, body, created_at, read_at")
+      .eq("user_id", userId)
+      .order("created_at", { ascending: false })
+      .limit(6)
   ]);
   const professionalProfile = professionalProfileResult.data as ProfessionalProfile | null;
   let professionalRole: ProfessionalRole | null = null;
@@ -353,6 +394,7 @@ async function getProfessionalDashboardData(userId: string) {
     accountRoles: (rolesResult.data ?? []) as AccountRole[],
     availabilityRules,
     bookingSummaries,
+    notifications: (notificationsResult.data ?? []) as NotificationPreview[],
     profile: profileResult.data as UserProfile | null,
     professionalProfile,
     professionalRole
@@ -403,6 +445,30 @@ function AvailabilityPreview({ rule }: { rule: AvailabilityRule }) {
         {formatTimeRange(rule.starts_at, rule.ends_at)}
       </p>
       {rule.notes ? <p className="mt-2 text-sm text-slate-600">{rule.notes}</p> : null}
+    </div>
+  );
+}
+
+function NotificationCard({ notification }: { notification: NotificationPreview }) {
+  return (
+    <div className="rounded-lg border bg-white p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-semibold text-slate-950">{notification.title}</p>
+        <Badge variant={notification.read_at ? "outline" : "default"}>
+          {notification.read_at ? "Read" : "New"}
+        </Badge>
+      </div>
+      {notification.body ? (
+        <p className="mt-2 text-sm leading-6 text-slate-600">{notification.body}</p>
+      ) : null}
+      <p className="mt-2 text-xs font-semibold text-slate-500">
+        {formatNotificationDate(notification.created_at)}
+      </p>
+      {notification.type === "shift_selected" ? (
+        <Button asChild className="mt-4" size="sm">
+          <Link href="/professional/shifts">Review shift</Link>
+        </Button>
+      ) : null}
     </div>
   );
 }
@@ -529,6 +595,14 @@ function formatShiftTime(startsAt: string, endsAt: string) {
   });
 
   return `${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
+}
+
+function formatNotificationDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeStyle: "short",
+    timeZone: "America/Los_Angeles"
+  }).format(new Date(value));
 }
 
 function formatStatus(value: string) {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  availableProfessionalSelectionSchema,
   bookingResponseSchema,
   bookingSelectionSchema,
   officeBookingLifecycleSchema,
@@ -83,6 +84,26 @@ describe("bookingSelectionSchema", () => {
     });
 
     expect(result.success).toBe(true);
+  });
+});
+
+describe("availableProfessionalSelectionSchema", () => {
+  it("accepts a professional profile id for office direct selection", () => {
+    const result = availableProfessionalSelectionSchema.safeParse({
+      professionalProfileId: "55555555-5555-4555-8555-555555555555",
+      shiftId: "66666666-6666-4666-8666-666666666666"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects malformed professional profile ids", () => {
+    const result = availableProfessionalSelectionSchema.safeParse({
+      professionalProfileId: "not-a-profile",
+      shiftId: "66666666-6666-4666-8666-666666666666"
+    });
+
+    expect(result.success).toBe(false);
   });
 });
 

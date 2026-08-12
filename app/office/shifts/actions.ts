@@ -2,12 +2,17 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import {
+  availabilityRuleCoversShift,
+  availabilityRuleOverlapsShift
+} from "@/lib/availability";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/database.types";
 import {
+  availableProfessionalSelectionSchema,
   bookingSelectionSchema,
   dollarsToCents,
   officeBookingLifecycleSchema,
@@ -25,6 +30,8 @@ type OrganizationMembership = {
 };
 
 type BookingEventInsert = Database["public"]["Tables"]["booking_events"]["Insert"];
+type BookingInsert = Database["public"]["Tables"]["bookings"]["Insert"];
+type NotificationInsert = Database["public"]["Tables"]["notifications"]["Insert"];
 type ShiftInsert = Database["public"]["Tables"]["shifts"]["Insert"];
 type ShiftUpdate = Database["public"]["Tables"]["shifts"]["Update"];
 
@@ -43,6 +50,27 @@ type BookingSelection = {
     | "cancelled"
     | "completed";
 };
+
+type ShiftForProfessionalSelection = {
+  id: string;
+  organization_id: string;
+  office_location_id: string;
+  professional_role_id: string;
+  status: "draft" | "open" | "pending" | "filled" | "completed" | "cancelled";
+  starts_at: string;
+  ends_at: string;
+  hourly_rate_cents: number | null;
+};
+
+type ProfessionalForSelection = {
+  id: string;
+  user_id: string;
+  professional_role_id: string;
+  hourly_rate_cents: number | null;
+};
+
+type AvailabilityRuleForSelection =
+  Database["public"]["Tables"]["availability_rules"]["Row"];
 
 const timezone = "America/Los_Angeles";
 const editableShiftStatuses = new Set(["draft", "open"]);
@@ -313,6 +341,154 @@ export async function acceptInterestedProfessional(formData: FormData) {
   revalidatePath("/professional/shifts");
   revalidatePath("/professional/dashboard");
   redirect(`/office/shifts/${parsed.data.shiftId}?selection=accepted`);
+}
+
+export async function selectAvailableProfessional(formData: FormData) {
+  const user = await requireUser();
+  const parsed = availableProfessionalSelectionSchema.safeParse({
+    professionalProfileId: formString(formData, "professional_profile_id"),
+    shiftId: formString(formData, "shift_id")
+  });
+
+  if (!parsed.success) {
+    redirect("/office/dashboard");
+  }
+
+  if (!isSupabaseServiceRoleConfigured()) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=service_required`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const organizationId = await getCurrentOrganizationId(supabase, user.id);
+
+  if (!organizationId) {
+    redirect("/office/dashboard");
+  }
+
+  const { data: shiftData } = await supabase
+    .from("shifts")
+    .select(
+      "id, organization_id, office_location_id, professional_role_id, status, starts_at, ends_at, hourly_rate_cents"
+    )
+    .eq("id", parsed.data.shiftId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+
+  const shift = shiftData as ShiftForProfessionalSelection | null;
+
+  if (!shift || shift.status !== "open") {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=unavailable`);
+  }
+
+  const admin = createSupabaseAdminClient();
+  const [{ data: professionalData }, { data: existingBookingData }, { data: availabilityData }] =
+    await Promise.all([
+      admin
+        .from("professional_profiles")
+        .select("id, user_id, professional_role_id, hourly_rate_cents")
+        .eq("id", parsed.data.professionalProfileId)
+        .maybeSingle(),
+      admin
+        .from("bookings")
+        .select("id, status")
+        .eq("shift_id", shift.id)
+        .eq("professional_profile_id", parsed.data.professionalProfileId)
+        .maybeSingle(),
+      admin
+        .from("availability_rules")
+        .select(
+          "id, professional_profile_id, kind, starts_at, ends_at, all_day, recurrence_rule, recurrence_starts_on, recurrence_ends_on, timezone, notes, created_at, updated_at"
+        )
+        .eq("professional_profile_id", parsed.data.professionalProfileId)
+    ]);
+  const professional = professionalData as ProfessionalForSelection | null;
+
+  if (!professional || professional.professional_role_id !== shift.professional_role_id) {
+    redirect(`/office/shifts/${shift.id}?selection=unavailable`);
+  }
+
+  if (existingBookingData) {
+    redirect(`/office/shifts/${shift.id}?selection=already_selected`);
+  }
+
+  const availabilityRules = (availabilityData ?? []) as AvailabilityRuleForSelection[];
+  const hasAvailableWindow = availabilityRules
+    .filter((rule) => rule.kind === "available")
+    .some((rule) => availabilityRuleCoversShift(rule, shift.starts_at, shift.ends_at));
+  const hasUnavailableConflict = availabilityRules
+    .filter((rule) => rule.kind === "unavailable")
+    .some((rule) => availabilityRuleOverlapsShift(rule, shift.starts_at, shift.ends_at));
+
+  if (!hasAvailableWindow || hasUnavailableConflict) {
+    redirect(`/office/shifts/${shift.id}?selection=no_availability`);
+  }
+
+  const now = new Date().toISOString();
+  const bookingPayload: BookingInsert = {
+    agreed_ends_at: shift.ends_at,
+    agreed_hourly_rate_cents: shift.hourly_rate_cents ?? professional.hourly_rate_cents,
+    agreed_starts_at: shift.starts_at,
+    office_location_id: shift.office_location_id,
+    organization_id: organizationId,
+    professional_profile_id: professional.id,
+    shift_id: shift.id,
+    status: "accepted"
+  };
+  const { data: bookingData, error } = await admin
+    .from("bookings")
+    .insert([bookingPayload] as never[])
+    .select("id")
+    .single();
+
+  if (error || !bookingData) {
+    redirect(`/office/shifts/${shift.id}?selection=failed`);
+  }
+
+  const booking = bookingData as { id: string };
+
+  await admin
+    .from("bookings")
+    .update({
+      status: "declined",
+      updated_at: now
+    } as never)
+    .eq("shift_id", shift.id)
+    .eq("organization_id", organizationId)
+    .in("status", ["interested", "invited", "requested", "pending_office_approval"]);
+
+  await admin
+    .from("shifts")
+    .update({
+      status: "pending",
+      updated_at: now
+    } as never)
+    .eq("id", shift.id)
+    .eq("organization_id", organizationId);
+
+  const eventPayload: BookingEventInsert = {
+    actor_user_id: user.id,
+    booking_id: booking.id,
+    event_type: "office_selected_available_professional",
+    metadata: { shift_id: shift.id }
+  };
+  const notificationPayload: NotificationInsert = {
+    body: "An office selected you for a shift. Confirm or decline it from your shift responses.",
+    metadata: { booking_id: booking.id, shift_id: shift.id },
+    title: "You were selected for a shift",
+    type: "shift_selected",
+    user_id: professional.user_id
+  };
+
+  await Promise.all([
+    admin.from("booking_events").insert([eventPayload] as never[]),
+    admin.from("notifications").insert([notificationPayload] as never[])
+  ]);
+
+  revalidatePath("/office/dashboard");
+  revalidatePath(`/office/shifts/${shift.id}`);
+  revalidatePath("/professional/shifts");
+  revalidatePath("/professional/dashboard");
+  redirect(`/office/shifts/${shift.id}?selection=selected`);
 }
 
 export async function updateBookedShiftLifecycle(formData: FormData) {
