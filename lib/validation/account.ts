@@ -110,6 +110,11 @@ export const officeBookingLifecycleSchema = z.object({
   shiftId: z.string().uuid()
 });
 
+export const notificationReadStateSchema = z.object({
+  action: z.enum(["read", "unread"]),
+  notificationId: z.string().uuid()
+});
+
 export const createInvitationSchema = z.object({
   email: z.string().email(),
   accountKind: accountKindSchema,

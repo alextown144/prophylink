@@ -271,9 +271,14 @@ export default async function ProfessionalDashboardPage() {
           </CardHeader>
           <CardContent className="grid gap-3">
             {notifications.length > 0 ? (
-              notifications.slice(0, 4).map((notification) => (
-                <NotificationCard key={notification.id} notification={notification} />
-              ))
+              <>
+                {notifications.slice(0, 4).map((notification) => (
+                  <NotificationCard key={notification.id} notification={notification} />
+                ))}
+                <Button asChild variant="outline">
+                  <Link href="/notifications">View all notifications</Link>
+                </Button>
+              </>
             ) : (
               <div className="rounded-lg bg-slate-50 p-4">
                 <p className="font-semibold text-slate-950">No notifications yet</p>
@@ -319,8 +324,8 @@ export default async function ProfessionalDashboardPage() {
         />
         <FutureCard
           icon={<ArrowRight className="h-5 w-5" />}
-          title="Shift matching"
-          text="Open browsing and confirmation are live; availability-based matching comes next."
+          title="Matching workflow"
+          text="Offices can now select available professionals; confirmation and completion are active."
         />
       </section>
     </main>
@@ -331,29 +336,29 @@ async function getProfessionalDashboardData(userId: string) {
   const supabase = await createSupabaseServerClient();
   const [profileResult, rolesResult, professionalProfileResult, notificationsResult] =
     await Promise.all([
-    supabase
-      .from("user_profiles")
-      .select("first_name, last_name, display_name, email, city, state, postal_code")
-      .eq("id", userId)
-      .maybeSingle(),
-    supabase
-      .from("account_roles")
-      .select("kind, onboarding_completed_at")
-      .eq("user_id", userId),
-    supabase
-      .from("professional_profiles")
-      .select(
-        "id, professional_role_id, short_bio, years_experience, hourly_rate_cents, preferred_radius_miles"
-      )
-      .eq("user_id", userId)
-      .maybeSingle(),
-    supabase
-      .from("notifications")
-      .select("id, type, title, body, created_at, read_at")
-      .eq("user_id", userId)
-      .order("created_at", { ascending: false })
-      .limit(6)
-  ]);
+      supabase
+        .from("user_profiles")
+        .select("first_name, last_name, display_name, email, city, state, postal_code")
+        .eq("id", userId)
+        .maybeSingle(),
+      supabase
+        .from("account_roles")
+        .select("kind, onboarding_completed_at")
+        .eq("user_id", userId),
+      supabase
+        .from("professional_profiles")
+        .select(
+          "id, professional_role_id, short_bio, years_experience, hourly_rate_cents, preferred_radius_miles"
+        )
+        .eq("user_id", userId)
+        .maybeSingle(),
+      supabase
+        .from("notifications")
+        .select("id, type, title, body, created_at, read_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(6)
+    ]);
   const professionalProfile = professionalProfileResult.data as ProfessionalProfile | null;
   let professionalRole: ProfessionalRole | null = null;
 

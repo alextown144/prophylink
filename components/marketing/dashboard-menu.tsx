@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { ChevronDown, LayoutDashboard, LogOut } from "lucide-react";
+import { Bell, ChevronDown, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
@@ -25,6 +25,7 @@ export function DashboardMenu() {
   const supabaseConfigured = isSupabaseConfigured();
   const [email, setEmail] = useState<string | null>(null);
   const [roles, setRoles] = useState<AccountKind[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(supabaseConfigured);
 
   useEffect(() => {
@@ -42,15 +43,23 @@ export function DashboardMenu() {
       if (!user) {
         setEmail(null);
         setRoles([]);
+        setUnreadCount(0);
         setLoading(false);
         return;
       }
 
-      const { data } = await supabase.from("account_roles").select("kind");
+      const [{ data }, { count }] = await Promise.all([
+        supabase.from("account_roles").select("kind"),
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .is("read_at", null)
+      ]);
       const nextRoles = ((data ?? []) as AccountRole[]).map((role) => role.kind);
 
       setEmail(user.email ?? "Signed in");
       setRoles(nextRoles);
+      setUnreadCount(count ?? 0);
       setLoading(false);
     }
 
@@ -99,6 +108,23 @@ export function DashboardMenu() {
           <p className="mt-1 truncate text-sm font-semibold text-slate-950">{email}</p>
         </div>
         <nav className="grid py-2">
+          <Link
+            className="focus-ring flex items-center justify-between gap-3 px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"
+            href="/notifications"
+          >
+            <span>
+              <span className="flex items-center gap-2 font-semibold text-slate-950">
+                <Bell className="h-4 w-4 text-teal-700" />
+                Notifications
+              </span>
+              <span className="text-xs text-slate-500">Alerts and shift updates</span>
+            </span>
+            {unreadCount > 0 ? (
+              <span className="rounded-full bg-teal-600 px-2 py-0.5 text-xs font-semibold text-white">
+                {unreadCount}
+              </span>
+            ) : null}
+          </Link>
           {links.map((link) => (
             <Link
               className="focus-ring px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"

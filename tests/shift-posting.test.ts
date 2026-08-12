@@ -3,6 +3,7 @@ import {
   availableProfessionalSelectionSchema,
   bookingResponseSchema,
   bookingSelectionSchema,
+  notificationReadStateSchema,
   officeBookingLifecycleSchema,
   shiftInterestSchema,
   shiftPostingSchema,
@@ -145,6 +146,26 @@ describe("officeBookingLifecycleSchema", () => {
       action: "reopen",
       bookingId: "99999999-9999-4999-8999-999999999999",
       shiftId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"
+    });
+
+    expect(result.success).toBe(false);
+  });
+});
+
+describe("notificationReadStateSchema", () => {
+  it("accepts a read state update", () => {
+    const result = notificationReadStateSchema.safeParse({
+      action: "read",
+      notificationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  it("rejects unsupported notification actions", () => {
+    const result = notificationReadStateSchema.safeParse({
+      action: "archive",
+      notificationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
     });
 
     expect(result.success).toBe(false);
