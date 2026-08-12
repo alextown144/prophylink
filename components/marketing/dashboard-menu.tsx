@@ -176,6 +176,11 @@ function buildDashboardLinks(roles: AccountKind[]): DashboardLink[] {
         section: "Professional"
       },
       {
+        href: "/professional/schedule",
+        label: "My schedule",
+        section: "Professional"
+      },
+      {
         href: "/professional/availability",
         label: "Availability calendar",
         section: "Professional"
@@ -188,6 +193,7 @@ function buildDashboardLinks(roles: AccountKind[]): DashboardLink[] {
     links.push(
       { href: "/office/dashboard", label: "Office dashboard", section: "Office" },
       { href: "/office/shifts/new", label: "Post a shift", section: "Office" },
+      { href: "/office/schedule", label: "Office schedule", section: "Office" },
       { href: "/office/profile", label: "Office profile", section: "Office" },
       { href: "/office/locations", label: "Office locations", section: "Office" }
     );

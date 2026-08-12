@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { blockingBookingStatuses } from "@/lib/booking-conflicts";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createNotificationsForOrganization } from "@/lib/notifications";
@@ -24,6 +25,8 @@ type BookingRef = {
   id: string;
   shift_id: string | null;
   organization_id: string;
+  agreed_starts_at: string;
+  agreed_ends_at: string;
   status:
     | "invited"
     | "interested"
@@ -92,6 +95,16 @@ export async function expressInterestInShift(formData: FormData) {
   }
 
   const admin = createSupabaseAdminClient();
+  const hasConflict = await professionalHasBlockingConflict(admin, {
+    endsAt: shift.ends_at,
+    professionalProfileId: professionalProfileRef.id,
+    startsAt: shift.starts_at
+  });
+
+  if (hasConflict) {
+    redirect("/professional/shifts?interest=conflict");
+  }
+
   const { data: existingBooking } = await admin
     .from("bookings")
     .select("id")
@@ -181,7 +194,7 @@ export async function respondToAcceptedShift(formData: FormData) {
 
   const { data: bookingData } = await supabase
     .from("bookings")
-    .select("id, shift_id, organization_id, status")
+    .select("id, shift_id, organization_id, agreed_starts_at, agreed_ends_at, status")
     .eq("id", parsed.data.bookingId)
     .eq("shift_id", parsed.data.shiftId)
     .eq("professional_profile_id", professionalProfileRef.id)
@@ -196,6 +209,19 @@ export async function respondToAcceptedShift(formData: FormData) {
   const admin = createSupabaseAdminClient();
   const now = new Date().toISOString();
   const confirms = parsed.data.action === "confirm";
+  const hasConflict = confirms
+    ? await professionalHasBlockingConflict(admin, {
+        endsAt: booking.agreed_ends_at,
+        excludeBookingId: booking.id,
+        professionalProfileId: professionalProfileRef.id,
+        startsAt: booking.agreed_starts_at
+      })
+    : false;
+
+  if (hasConflict) {
+    redirect("/professional/shifts?response=conflict");
+  }
+
   const { error } = await admin
     .from("bookings")
     .update({
@@ -242,4 +268,36 @@ export async function respondToAcceptedShift(formData: FormData) {
   revalidatePath("/office/dashboard");
   revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
   redirect(`/professional/shifts?response=${confirms ? "confirmed" : "declined"}`);
+}
+
+async function professionalHasBlockingConflict(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  {
+    endsAt,
+    excludeBookingId,
+    professionalProfileId,
+    startsAt
+  }: {
+    endsAt: string;
+    excludeBookingId?: string;
+    professionalProfileId: string;
+    startsAt: string;
+  }
+) {
+  let query = admin
+    .from("bookings")
+    .select("id")
+    .eq("professional_profile_id", professionalProfileId)
+    .in("status", [...blockingBookingStatuses])
+    .lt("agreed_starts_at", endsAt)
+    .gt("agreed_ends_at", startsAt)
+    .limit(1);
+
+  if (excludeBookingId) {
+    query = query.neq("id", excludeBookingId);
+  }
+
+  const { data } = await query.maybeSingle();
+
+  return Boolean(data);
 }

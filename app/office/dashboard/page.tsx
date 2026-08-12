@@ -99,6 +99,12 @@ export default async function OfficeDashboardPage() {
               Post a shift
             </Link>
           </Button>
+          <Button asChild variant="outline">
+            <Link href="/office/schedule">
+              <CalendarCheck className="h-4 w-4" />
+              Schedule
+            </Link>
+          </Button>
           <Button asChild>
             <Link href="/office/profile">
               {organization ? "Edit office profile" : "Finish setup"}
@@ -242,7 +248,7 @@ export default async function OfficeDashboardPage() {
           <FutureCard
             icon={<ClipboardList className="h-5 w-5" />}
             title="Shift workflow"
-            text="Next milestones will add candidate matching, booking requests, and office-side confirmations."
+            text="Selection, confirmation, conflict checks, and schedule tracking are active."
           />
           <FutureCard
             icon={<Search className="h-5 w-5" />}

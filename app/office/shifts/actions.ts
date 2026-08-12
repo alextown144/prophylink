@@ -6,6 +6,7 @@ import {
   availabilityRuleCoversShift,
   availabilityRuleOverlapsShift
 } from "@/lib/availability";
+import { blockingBookingStatuses } from "@/lib/booking-conflicts";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createNotificationForUser } from "@/lib/notifications";
@@ -40,6 +41,8 @@ type BookingSelection = {
   shift_id: string | null;
   organization_id: string;
   professional_profile_id: string;
+  agreed_starts_at: string;
+  agreed_ends_at: string;
   status:
     | "invited"
     | "interested"
@@ -285,7 +288,9 @@ export async function acceptInterestedProfessional(formData: FormData) {
 
   const { data } = await supabase
     .from("bookings")
-    .select("id, shift_id, organization_id, professional_profile_id, status")
+    .select(
+      "id, shift_id, organization_id, professional_profile_id, agreed_starts_at, agreed_ends_at, status"
+    )
     .eq("id", parsed.data.bookingId)
     .eq("shift_id", parsed.data.shiftId)
     .eq("organization_id", organizationId)
@@ -299,6 +304,16 @@ export async function acceptInterestedProfessional(formData: FormData) {
 
   const admin = createSupabaseAdminClient();
   const now = new Date().toISOString();
+  const hasConflict = await professionalHasBlockingConflict(admin, {
+    endsAt: booking.agreed_ends_at,
+    excludeBookingId: booking.id,
+    professionalProfileId: booking.professional_profile_id,
+    startsAt: booking.agreed_starts_at
+  });
+
+  if (hasConflict) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=conflict`);
+  }
 
   const { error } = await admin
     .from("bookings")
@@ -434,12 +449,21 @@ export async function selectAvailableProfessional(formData: FormData) {
   }
 
   const availabilityRules = (availabilityData ?? []) as AvailabilityRuleForSelection[];
+  const hasBookingConflict = await professionalHasBlockingConflict(admin, {
+    endsAt: shift.ends_at,
+    professionalProfileId: professional.id,
+    startsAt: shift.starts_at
+  });
   const hasAvailableWindow = availabilityRules
     .filter((rule) => rule.kind === "available")
     .some((rule) => availabilityRuleCoversShift(rule, shift.starts_at, shift.ends_at));
   const hasUnavailableConflict = availabilityRules
     .filter((rule) => rule.kind === "unavailable")
     .some((rule) => availabilityRuleOverlapsShift(rule, shift.starts_at, shift.ends_at));
+
+  if (hasBookingConflict) {
+    redirect(`/office/shifts/${shift.id}?selection=conflict`);
+  }
 
   if (!hasAvailableWindow || hasUnavailableConflict) {
     redirect(`/office/shifts/${shift.id}?selection=no_availability`);
@@ -536,7 +560,9 @@ export async function updateBookedShiftLifecycle(formData: FormData) {
 
   const { data } = await supabase
     .from("bookings")
-    .select("id, shift_id, organization_id, professional_profile_id, status")
+    .select(
+      "id, shift_id, organization_id, professional_profile_id, agreed_starts_at, agreed_ends_at, status"
+    )
     .eq("id", parsed.data.bookingId)
     .eq("shift_id", parsed.data.shiftId)
     .eq("organization_id", organizationId)
@@ -655,6 +681,38 @@ async function getCurrentOrganizationId(
   const organizationMembership = membership as OrganizationMembership | null;
 
   return organizationMembership?.organization_id ?? null;
+}
+
+async function professionalHasBlockingConflict(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  {
+    endsAt,
+    excludeBookingId,
+    professionalProfileId,
+    startsAt
+  }: {
+    endsAt: string;
+    excludeBookingId?: string;
+    professionalProfileId: string;
+    startsAt: string;
+  }
+) {
+  let query = admin
+    .from("bookings")
+    .select("id")
+    .eq("professional_profile_id", professionalProfileId)
+    .in("status", [...blockingBookingStatuses])
+    .lt("agreed_starts_at", endsAt)
+    .gt("agreed_ends_at", startsAt)
+    .limit(1);
+
+  if (excludeBookingId) {
+    query = query.neq("id", excludeBookingId);
+  }
+
+  const { data } = await query.maybeSingle();
+
+  return Boolean(data);
 }
 
 function localPacificDateTimeToIso(date: string, time: string) {

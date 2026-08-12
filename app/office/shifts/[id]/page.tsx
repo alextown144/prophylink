@@ -22,6 +22,7 @@ import {
   parseWeeklyRecurrenceDays,
   type AvailabilityWindowRule
 } from "@/lib/availability";
+import { blockingBookingStatuses } from "@/lib/booking-conflicts";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -104,6 +105,10 @@ type CandidateProfile = {
 type CandidateBooking = {
   professional_profile_id: string;
   status: ShiftBooking["status"];
+};
+
+type CandidateBlockingBooking = {
+  professional_profile_id: string;
 };
 
 type AvailabilityRule = Database["public"]["Tables"]["availability_rules"]["Row"];
@@ -324,7 +329,7 @@ async function getAvailableProfessionalsForShift(shift: OfficeShiftDetail) {
     return [];
   }
 
-  const [availabilityResult, bookingsResult] = await Promise.all([
+  const [availabilityResult, bookingsResult, blockingBookingsResult] = await Promise.all([
     admin
       .from("availability_rules")
       .select(
@@ -335,10 +340,22 @@ async function getAvailableProfessionalsForShift(shift: OfficeShiftDetail) {
       .from("bookings")
       .select("professional_profile_id, status")
       .eq("shift_id", shift.id)
+      .in("professional_profile_id", profileIds),
+    admin
+      .from("bookings")
+      .select("professional_profile_id")
       .in("professional_profile_id", profileIds)
+      .in("status", [...blockingBookingStatuses])
+      .lt("agreed_starts_at", shift.ends_at)
+      .gt("agreed_ends_at", shift.starts_at)
   ]);
   const rulesByProfileId = new Map<string, AvailabilityRule[]>();
   const bookingStatusByProfileId = new Map<string, ShiftBooking["status"]>();
+  const conflictingProfileIds = new Set(
+    ((blockingBookingsResult.data ?? []) as CandidateBlockingBooking[]).map(
+      (booking) => booking.professional_profile_id
+    )
+  );
 
   ((availabilityResult.data ?? []) as AvailabilityRule[]).forEach((rule) => {
     rulesByProfileId.set(rule.professional_profile_id, [
@@ -360,7 +377,7 @@ async function getAvailableProfessionalsForShift(shift: OfficeShiftDetail) {
         .filter((rule) => rule.kind === "unavailable")
         .some((rule) => availabilityRuleOverlapsShift(rule, shift.starts_at, shift.ends_at));
 
-      if (!matchingRule || hasUnavailableConflict) {
+      if (!matchingRule || hasUnavailableConflict || conflictingProfileIds.has(profile.id)) {
         return null;
       }
 
@@ -635,6 +652,7 @@ function StatusMessage({
       : {
           accepted: "Professional accepted. Other interested responses were declined.",
           already_selected: "That professional already has a response for this shift.",
+          conflict: "That professional already has an accepted or confirmed shift during this time.",
           failed: "Professional could not be accepted. Try again.",
           no_availability: "That professional is no longer available for the full shift.",
           service_required: "Server configuration is required before accepting professionals.",

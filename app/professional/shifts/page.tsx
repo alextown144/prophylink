@@ -8,6 +8,7 @@ import {
   Sparkles
 } from "lucide-react";
 import Link from "next/link";
+import { hasBlockingBookingConflict } from "@/lib/booking-conflicts";
 import { requireUser } from "@/lib/auth/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,10 @@ type OpenShift = {
     id: string;
     name: string;
   } | null;
+};
+
+type OpenShiftWithConflict = OpenShift & {
+  hasScheduleConflict: boolean;
 };
 
 type BookingInterest = {
@@ -101,6 +106,9 @@ export default async function ProfessionalShiftsPage({
             <Link href="/professional/availability">Manage availability</Link>
           </Button>
           <Button asChild variant="outline">
+            <Link href="/professional/schedule">My schedule</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href="/professional/dashboard">Dashboard</Link>
           </Button>
         </div>
@@ -149,6 +157,7 @@ export default async function ProfessionalShiftsPage({
               openShifts.map((shift) => (
                 <ShiftCard
                   booking={bookingsByShiftId.get(shift.id)}
+                  hasScheduleConflict={shift.hasScheduleConflict}
                   isRoleMatch={
                     shift.professional_roles?.id === professionalProfile.professional_role_id
                   }
@@ -205,6 +214,12 @@ async function getShiftBoardData(userId: string) {
 
   const bookings = (bookingsResult.data ?? []) as BookingInterest[];
   const bookingsByShiftId = new Map<string, BookingInterest>();
+  const blockingBookings = bookings.filter(
+    (booking): booking is BookingInterest & {
+      agreed_ends_at: string;
+      agreed_starts_at: string;
+    } => Boolean(booking.agreed_starts_at && booking.agreed_ends_at)
+  );
 
   bookings.forEach((booking) => {
     if (booking.shift_id) {
@@ -215,7 +230,13 @@ async function getShiftBoardData(userId: string) {
   return {
     bookingsByShiftId,
     myBookings: bookings,
-    openShifts: (openShiftsResult.data ?? []) as OpenShift[],
+    openShifts: ((openShiftsResult.data ?? []) as OpenShift[]).map((shift) => ({
+      ...shift,
+      hasScheduleConflict: hasBlockingBookingConflict(blockingBookings, {
+        ends_at: shift.ends_at,
+        starts_at: shift.starts_at
+      })
+    })),
     professionalProfile
   };
 }
@@ -269,12 +290,14 @@ function ResponseRow({ booking }: { booking: BookingInterest }) {
 
 function ShiftCard({
   booking,
+  hasScheduleConflict,
   isRoleMatch,
   shift
 }: {
   booking?: BookingInterest;
+  hasScheduleConflict: boolean;
   isRoleMatch: boolean;
-  shift: OpenShift;
+  shift: OpenShiftWithConflict;
 }) {
   return (
     <Card>
@@ -337,13 +360,26 @@ function ShiftCard({
                 </p>
               </div>
             ) : (
-              <form action={expressInterestInShift}>
-                <input name="shift_id" type="hidden" value={shift.id} />
-                <Button className="w-full" type="submit">
-                  I&apos;m interested
-                  <ArrowRight className="h-4 w-4" />
-                </Button>
-              </form>
+              <>
+                {hasScheduleConflict ? (
+                  <div className="rounded-lg border bg-white p-3">
+                    <p className="text-sm font-semibold text-slate-950">
+                      Conflicts with your schedule
+                    </p>
+                    <p className="mt-1 text-sm leading-6 text-slate-600">
+                      You already have an accepted or confirmed shift during this time.
+                    </p>
+                  </div>
+                ) : (
+                  <form action={expressInterestInShift}>
+                    <input name="shift_id" type="hidden" value={shift.id} />
+                    <Button className="w-full" type="submit">
+                      I&apos;m interested
+                      <ArrowRight className="h-4 w-4" />
+                    </Button>
+                  </form>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -357,6 +393,7 @@ function InterestMessage({ status }: { status: string }) {
     {
       already_sent: "You already sent interest for that shift.",
       failed: "Interest could not be sent. Try again.",
+      conflict: "That shift conflicts with an accepted or confirmed shift already on your schedule.",
       profile_required: "Complete your professional profile before sending interest.",
       sent: "Interest sent. The office can now see your response.",
       service_required: "Server configuration is required before interest can be sent.",
@@ -376,6 +413,7 @@ function ResponseMessage({ status }: { status: string }) {
       confirmed: "Shift confirmed. The office will see this as filled.",
       declined: "Shift declined. The posting was reopened for the office.",
       failed: "Shift response could not be saved. Try again.",
+      conflict: "That shift conflicts with another accepted or confirmed shift on your schedule.",
       profile_required: "Complete your professional profile before responding.",
       service_required: "Server configuration is required before confirming shifts.",
       unavailable: "That accepted shift is no longer available."

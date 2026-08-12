@@ -126,6 +126,9 @@ export default async function ProfessionalDashboardPage() {
             <Link href="/professional/availability">Manage availability</Link>
           </Button>
           <Button asChild variant="outline">
+            <Link href="/professional/schedule">My schedule</Link>
+          </Button>
+          <Button asChild variant="outline">
             <Link href="/professional/profile">Edit profile</Link>
           </Button>
           {isAdmin ? (
