@@ -102,12 +102,12 @@ export function DashboardMenu() {
         Dashboard
         <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="absolute right-0 top-12 z-50 w-72 overflow-hidden rounded-lg border border-slate-200 bg-white shadow-brand">
-        <div className="border-b bg-slate-50 px-4 py-3">
+      <div className="absolute right-0 top-12 z-50 flex max-h-[calc(100dvh-6rem)] w-[calc(100vw-2rem)] max-w-72 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-brand">
+        <div className="shrink-0 border-b bg-slate-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase text-slate-500">Signed in</p>
           <p className="mt-1 truncate text-sm font-semibold text-slate-950">{email}</p>
         </div>
-        <nav className="grid py-2">
+        <nav className="grid overflow-y-auto py-2">
           <Link
             className="focus-ring flex items-center justify-between gap-3 px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"
             href="/notifications"
@@ -143,7 +143,7 @@ export function DashboardMenu() {
             </Link>
           ))}
         </nav>
-        <div className="border-t p-2">
+        <div className="shrink-0 border-t bg-white p-2">
           <button
             className="focus-ring flex w-full items-center gap-2 rounded-md px-3 py-2 text-left text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-100"
             onClick={handleSignOut}
