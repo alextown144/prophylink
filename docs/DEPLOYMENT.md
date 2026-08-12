@@ -36,10 +36,15 @@ Required once billing is implemented:
 - `STRIPE_OFFICE_BASIC_PRICE_ID`
 - `STRIPE_OFFICE_PRO_PRICE_ID`
 
-Required once email is implemented:
+Required for email handoff:
 
+- `EMAIL_DELIVERY_MODE` (`off`, `log`, or `resend`)
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
+
+Use `EMAIL_DELIVERY_MODE=log` during setup to verify that app events reach the
+email handoff path without sending real email. Use `EMAIL_DELIVERY_MODE=resend`
+only after `RESEND_API_KEY` and a verified `EMAIL_FROM` sender are configured.
 
 ## Supabase Setup
 

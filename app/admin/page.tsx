@@ -13,6 +13,7 @@ import Link from "next/link";
 import { InvitationForm } from "@/components/admin/invitation-form";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { requireAdmin } from "@/lib/auth/session";
+import { serverEnv } from "@/lib/config/server-env";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -166,6 +167,7 @@ export default async function AdminDashboardPage() {
             <StatusLine label="Invite mode" value="invite_only" />
             <StatusLine label="Marketplace approval" value="not required" />
             <StatusLine label="Coverage exchange MVP" value="professional-to-professional" />
+            <StatusLine label="Email handoff" value={serverEnv.EMAIL_DELIVERY_MODE} />
           </CardContent>
         </Card>
       </section>

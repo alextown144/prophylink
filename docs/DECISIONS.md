@@ -65,3 +65,9 @@ Reason: Invite validation and account bootstrap cannot rely on browser-only chec
 Decision: Store credential files in a private Supabase Storage bucket named `credentials`, keep credential rows tied to professional profiles, and use admin-generated signed URLs for review. Professionals can insert pending credentials and read their own rows, while admin review is required to mark credentials verified or rejected.
 
 Reason: Credential files are sensitive professional records. Offices need marketplace trust signals, but they do not need direct access to raw credential files in the MVP.
+
+## 2026-08-12: Email handoff follows in-app notifications
+
+Decision: Keep in-app notifications as the source of truth and send optional transactional email from the centralized notification helper for important shift, message, and credential events. Email delivery is server-only and controlled by `EMAIL_DELIVERY_MODE`.
+
+Reason: This keeps event logic in one place, avoids duplicate notification code in individual workflows, and lets beta run without a live sender until the domain and Resend key are configured.
