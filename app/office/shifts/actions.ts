@@ -200,10 +200,17 @@ export async function postOfficeShift(
   const postedShift = postedShiftData as PostedShiftForMatching;
 
   if (postedShift.status === "open") {
-    await notifyAvailableProfessionalsForPostedShift(admin, {
+    const notifiedCount = await notifyAvailableProfessionalsForPostedShift(admin, {
       roleName: professionalRole.name,
       shift: postedShift
     });
+
+    revalidatePath("/office/dashboard");
+    revalidatePath("/office/shifts/new");
+    revalidatePath("/professional/shifts");
+    revalidatePath("/professional/dashboard");
+    revalidatePath("/notifications");
+    redirect(`/office/shifts/${postedShift.id}?posted=1&matches=${notifiedCount}`);
   }
 
   revalidatePath("/office/dashboard");
@@ -614,6 +621,57 @@ export async function selectAvailableProfessional(formData: FormData) {
   redirect(`/office/shifts/${shift.id}?selection=selected`);
 }
 
+export async function notifyMatchingProfessionalsForShift(formData: FormData) {
+  const user = await requireUser();
+  const shiftId = formString(formData, "shift_id");
+
+  if (!shiftId) {
+    redirect("/office/dashboard");
+  }
+
+  if (!isSupabaseServiceRoleConfigured()) {
+    redirect(`/office/shifts/${shiftId}?selection=service_required`);
+  }
+
+  const supabase = await createSupabaseServerClient();
+  const organizationId = await getCurrentOrganizationId(supabase, user.id);
+
+  if (!organizationId) {
+    redirect("/office/dashboard");
+  }
+
+  const { data: shiftData } = await supabase
+    .from("shifts")
+    .select(
+      "id, organization_id, professional_role_id, status, starts_at, ends_at, professional_roles(name)"
+    )
+    .eq("id", shiftId)
+    .eq("organization_id", organizationId)
+    .maybeSingle();
+  const shift = shiftData as
+    | (PostedShiftForMatching & {
+        organization_id: string;
+        professional_roles: { name: string } | null;
+      })
+    | null;
+
+  if (!shift || shift.status !== "open") {
+    redirect(`/office/shifts/${shiftId}?selection=unavailable`);
+  }
+
+  const admin = createSupabaseAdminClient();
+  const notifiedCount = await notifyAvailableProfessionalsForPostedShift(admin, {
+    roleName: shift.professional_roles?.name ?? "Professional",
+    shift
+  });
+
+  revalidatePath(`/office/shifts/${shift.id}`);
+  revalidatePath("/notifications");
+  revalidatePath("/professional/dashboard");
+  revalidatePath("/professional/shifts");
+  redirect(`/office/shifts/${shift.id}?selection=match_notified&matches=${notifiedCount}`);
+}
+
 export async function updateBookedShiftLifecycle(formData: FormData) {
   const user = await requireUser();
   const parsed = officeBookingLifecycleSchema.safeParse({
@@ -803,11 +861,31 @@ async function notifyAvailableProfessionalsForPostedShift(
     roleName: string;
     shift: PostedShiftForMatching;
   }
-) {
+): Promise<number> {
   const matches = await getAvailableProfessionalsForShift(admin, shift, 20);
+  const { data: existingNotifications, error } = await admin
+    .from("notifications")
+    .select("user_id")
+    .eq("type", "shift_match")
+    .filter("metadata->>shift_id", "eq", shift.id);
 
-  await Promise.all(
-    matches.map((professional) =>
+  if (error) {
+    console.warn("[notifications] Existing shift match lookup failed.", {
+      error: error.message,
+      shiftId: shift.id
+    });
+  }
+
+  const alreadyNotifiedUserIds = new Set(
+    ((existingNotifications ?? []) as { user_id: string }[]).map(
+      (notification) => notification.user_id
+    )
+  );
+  const newMatches = matches.filter(
+    (professional) => !alreadyNotifiedUserIds.has(professional.userId)
+  );
+  const notifications = await Promise.all(
+    newMatches.map((professional) =>
       createNotificationForUser(admin, professional.userId, {
         body: `A ${roleName} shift matches your saved availability for ${formatShiftWindow(shift.starts_at, shift.ends_at)}.`,
         metadata: { shift_id: shift.id },
@@ -816,6 +894,16 @@ async function notifyAvailableProfessionalsForPostedShift(
       })
     )
   );
+  const notifiedCount = notifications.filter(Boolean).length;
+
+  console.info("[notifications] Shift match notification summary.", {
+    matched: matches.length,
+    notified: notifiedCount,
+    shiftId: shift.id,
+    skippedExisting: matches.length - newMatches.length
+  });
+
+  return notifiedCount;
 }
 
 function localPacificDateTimeToIso(date: string, time: string) {

@@ -22,15 +22,26 @@ export async function createNotificationForUser(
   userId: string,
   payload: NotificationPayload
 ) {
-  const { data } = await admin
+  const { data, error } = await admin
     .from("notifications")
     .insert([{ ...payload, user_id: userId }] as never[])
     .select("id, user_id, type, title, body, metadata, created_at, read_at")
     .maybeSingle();
 
+  if (error) {
+    console.warn("[notifications] Notification insert failed.", {
+      error: error.message,
+      type: payload.type,
+      userId
+    });
+    return null;
+  }
+
   if (data) {
     await sendNotificationEmail(admin, data as NotificationRow);
   }
+
+  return data ? (data as NotificationRow) : null;
 }
 
 export async function createNotificationsForOrganization(
@@ -50,10 +61,19 @@ export async function createNotificationsForOrganization(
     return;
   }
 
-  const { data: notifications } = await admin
+  const { data: notifications, error } = await admin
     .from("notifications")
     .insert(userIds.map((userId) => ({ ...payload, user_id: userId })) as never[])
     .select("id, user_id, type, title, body, metadata, created_at, read_at");
+
+  if (error) {
+    console.warn("[notifications] Organization notification insert failed.", {
+      error: error.message,
+      organizationId,
+      type: payload.type
+    });
+    return;
+  }
 
   await Promise.all(
     ((notifications ?? []) as NotificationRow[]).map((notification) =>

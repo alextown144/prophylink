@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import {
   acceptInterestedProfessional,
+  notifyMatchingProfessionalsForShift,
   selectAvailableProfessional,
   updateBookedShiftLifecycle
 } from "@/app/office/shifts/actions";
@@ -35,6 +36,7 @@ type PageProps = {
   }>;
   searchParams: Promise<{
     lifecycle?: string;
+    matches?: string;
     posted?: string;
     selection?: string;
     updated?: string;
@@ -142,6 +144,7 @@ export default async function OfficeShiftDetailPage({
 
       <StatusMessage
         lifecycle={messages.lifecycle}
+        matches={messages.matches}
         posted={messages.posted}
         selection={messages.selection}
         updated={messages.updated}
@@ -414,13 +417,21 @@ function AvailableProfessionalsCard({
             </p>
           </div>
         ) : professionals.length > 0 ? (
-          professionals.map((professional) => (
-            <AvailableProfessionalCard
-              key={professional.id}
-              professional={professional}
-              shiftId={shiftId}
-            />
-          ))
+          <>
+            <form action={notifyMatchingProfessionalsForShift}>
+              <input name="shift_id" type="hidden" value={shiftId} />
+              <Button className="w-full sm:w-auto" type="submit" variant="outline">
+                Notify matching professionals
+              </Button>
+            </form>
+            {professionals.map((professional) => (
+              <AvailableProfessionalCard
+                key={professional.id}
+                professional={professional}
+                shiftId={shiftId}
+              />
+            ))}
+          </>
         ) : (
           <div className="rounded-lg bg-slate-50 p-5">
             <p className="font-semibold text-slate-950">No matching availability yet</p>
@@ -501,18 +512,23 @@ function AvailableProfessionalCard({
 
 function StatusMessage({
   lifecycle,
+  matches,
   posted,
   selection,
   updated
 }: {
   lifecycle?: string;
+  matches?: string;
   posted?: string;
   selection?: string;
   updated?: string;
 }) {
+  const matchCount = Number(matches ?? 0);
   const message =
     posted === "1"
-      ? "Shift posted. Matching professionals with saved availability are listed below and have been notified."
+      ? matchCount > 0
+        ? `Shift posted. ${matchCount} matching professional${matchCount === 1 ? "" : "s"} notified.`
+        : "Shift posted. No new matching professional notifications were sent."
       : updated === "1"
       ? "Shift updated."
       : lifecycle
@@ -528,6 +544,10 @@ function StatusMessage({
           already_selected: "That professional already has a response for this shift.",
           conflict: "That professional already has an accepted or confirmed shift during this time.",
           failed: "Professional could not be accepted. Try again.",
+          match_notified:
+            matchCount > 0
+              ? `${matchCount} matching professional${matchCount === 1 ? "" : "s"} notified.`
+              : "No new matching professional notifications were sent.",
           no_availability: "That professional is no longer available for the full shift.",
           plan_required: "Your current office plan does not include this marketplace action.",
           service_required: "Server configuration is required before accepting professionals.",
