@@ -22,6 +22,7 @@ export function isSupabaseServiceRoleConfigured() {
 export function isEmailDeliveryConfigured() {
   return (
     serverEnv.EMAIL_DELIVERY_MODE === "log" ||
-    Boolean(serverEnv.RESEND_API_KEY && serverEnv.EMAIL_FROM)
+    (serverEnv.EMAIL_DELIVERY_MODE === "resend" &&
+      Boolean(serverEnv.RESEND_API_KEY && serverEnv.EMAIL_FROM))
   );
 }

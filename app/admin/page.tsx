@@ -10,10 +10,12 @@ import {
   UsersRound
 } from "lucide-react";
 import Link from "next/link";
+import { EmailTestForm } from "@/components/admin/email-test-form";
 import { InvitationForm } from "@/components/admin/invitation-form";
 import { MetricCard } from "@/components/dashboard/metric-card";
 import { requireAdmin } from "@/lib/auth/session";
-import { serverEnv } from "@/lib/config/server-env";
+import { isEmailDeliveryConfigured, serverEnv } from "@/lib/config/server-env";
+import { normalizeEmailSender } from "@/lib/email";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -168,6 +170,19 @@ export default async function AdminDashboardPage() {
             <StatusLine label="Marketplace approval" value="not required" />
             <StatusLine label="Coverage exchange MVP" value="professional-to-professional" />
             <StatusLine label="Email handoff" value={serverEnv.EMAIL_DELIVERY_MODE} />
+            <StatusLine
+              label="Resend API key"
+              value={serverEnv.RESEND_API_KEY ? "present" : "missing"}
+            />
+            <StatusLine
+              label="Sender"
+              value={normalizeEmailSender(serverEnv.EMAIL_FROM) || "missing"}
+            />
+            <StatusLine
+              label="Email ready"
+              value={isEmailDeliveryConfigured() ? "yes" : "no"}
+            />
+            <EmailTestForm />
           </CardContent>
         </Card>
       </section>

@@ -28,14 +28,16 @@ export async function sendEmail(message: EmailMessage) {
     return { delivered: false, mode: "log" as const };
   }
 
-  if (!serverEnv.RESEND_API_KEY || !serverEnv.EMAIL_FROM) {
+  const from = normalizeEmailSender(serverEnv.EMAIL_FROM);
+
+  if (!serverEnv.RESEND_API_KEY || !from) {
     console.warn("[email:resend] Missing RESEND_API_KEY or EMAIL_FROM.");
     return { delivered: false, mode: "resend" as const };
   }
 
   const response = await fetch("https://api.resend.com/emails", {
     body: JSON.stringify({
-      from: serverEnv.EMAIL_FROM,
+      from,
       subject: message.subject,
       text: message.text,
       to: [message.to]
@@ -73,4 +75,17 @@ export function appUrl(path: string) {
   const normalizedPath = path.startsWith("/") ? path : `/${path}`;
 
   return `${baseUrl}${normalizedPath}`;
+}
+
+export function normalizeEmailSender(value?: string) {
+  let sender = value?.trim() ?? "";
+
+  while (
+    (sender.startsWith('"') && sender.endsWith('"')) ||
+    (sender.startsWith("'") && sender.endsWith("'"))
+  ) {
+    sender = sender.slice(1, -1).trim();
+  }
+
+  return sender;
 }

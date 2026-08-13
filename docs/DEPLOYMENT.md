@@ -42,6 +42,10 @@ Required for email handoff:
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 
+For Vercel, enter `EMAIL_FROM` without wrapping quotes, for example
+`ProphyLink <notifications@prophylink.com>`. Local `.env` files can tolerate
+quotes, but the Vercel dashboard stores the value literally.
+
 Use `EMAIL_DELIVERY_MODE=log` during setup to verify that app events reach the
 email handoff path without sending real email. Use `EMAIL_DELIVERY_MODE=resend`
 only after `RESEND_API_KEY` and a verified `EMAIL_FROM` sender are configured.
