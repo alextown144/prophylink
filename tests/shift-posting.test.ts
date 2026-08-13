@@ -5,6 +5,7 @@ import {
   bookingResponseSchema,
   bookingSelectionSchema,
   messageSendSchema,
+  notificationOpenTargetSchema,
   notificationReadStateSchema,
   officeBookingLifecycleSchema,
   shiftInterestSchema,
@@ -171,6 +172,16 @@ describe("notificationReadStateSchema", () => {
     });
 
     expect(result.success).toBe(false);
+  });
+});
+
+describe("notificationOpenTargetSchema", () => {
+  it("accepts a notification id for opening the target", () => {
+    const result = notificationOpenTargetSchema.safeParse({
+      notificationId: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb"
+    });
+
+    expect(result.success).toBe(true);
   });
 });
 

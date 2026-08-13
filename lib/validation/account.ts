@@ -115,6 +115,10 @@ export const notificationReadStateSchema = z.object({
   notificationId: z.string().uuid()
 });
 
+export const notificationOpenTargetSchema = z.object({
+  notificationId: z.string().uuid()
+});
+
 export const bookingConversationSchema = z.object({
   bookingId: z.string().uuid()
 });

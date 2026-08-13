@@ -1,6 +1,9 @@
 import { ArrowLeft, Bell, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
-import { updateNotificationReadState } from "@/app/notifications/actions";
+import {
+  openNotificationTarget,
+  updateNotificationReadState
+} from "@/app/notifications/actions";
 import { requireUser } from "@/lib/auth/session";
 import type { Json } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -137,9 +140,12 @@ function NotificationRow({ notification }: { notification: Notification }) {
         </div>
         <div className="grid shrink-0 gap-2 sm:flex sm:flex-wrap">
           {targetHref ? (
-            <Button asChild className="w-full sm:w-auto" size="sm">
-              <Link href={targetHref}>{targetLabel}</Link>
-            </Button>
+            <form action={openNotificationTarget} className="w-full sm:w-auto">
+              <input name="notification_id" type="hidden" value={notification.id} />
+              <Button className="w-full sm:w-auto" size="sm" type="submit">
+                {targetLabel}
+              </Button>
+            </form>
           ) : null}
           <form action={updateNotificationReadState} className="w-full sm:w-auto">
             <input name="notification_id" type="hidden" value={notification.id} />
