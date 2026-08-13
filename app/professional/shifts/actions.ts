@@ -8,6 +8,7 @@ import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createNotificationsForOrganization } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { userHasProfessionalCapability } from "@/lib/subscription-gates";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   bookingResponseSchema,
@@ -95,6 +96,16 @@ export async function expressInterestInShift(formData: FormData) {
   }
 
   const admin = createSupabaseAdminClient();
+  const canExpressInterest = await userHasProfessionalCapability(
+    admin,
+    user.id,
+    "express_interest"
+  );
+
+  if (!canExpressInterest) {
+    redirect("/professional/shifts?interest=plan_required");
+  }
+
   const hasConflict = await professionalHasBlockingConflict(admin, {
     endsAt: shift.ends_at,
     professionalProfileId: professionalProfileRef.id,

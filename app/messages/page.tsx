@@ -227,6 +227,7 @@ function StatusMessage({ status }: { status?: string }) {
     {
       failed: "Messaging could not be updated. Try again.",
       invalid: "That messaging action was not valid.",
+      plan_required: "Your current plan does not include booking messaging.",
       service_required: "Server configuration is required before messaging can be used.",
       unavailable: "That conversation is not available for your account."
     }[status ?? ""] ?? null;

@@ -71,3 +71,9 @@ Reason: Credential files are sensitive professional records. Offices need market
 Decision: Keep in-app notifications as the source of truth and send optional transactional email from the centralized notification helper for important shift, message, and credential events. Email delivery is server-only and controlled by `EMAIL_DELIVERY_MODE`.
 
 Reason: This keeps event logic in one place, avoids duplicate notification code in individual workflows, and lets beta run without a live sender until the domain and Resend key are configured.
+
+## 2026-08-12: Enforce subscription gates from plan entitlements
+
+Decision: Enforce marketplace gates server-side from `subscription_plans.entitlements`, with admin-editable plan checkboxes. During beta, users without subscription rows receive baseline access from `professional_free` or `office_basic`; active paid plans layer additional entitlements on top.
+
+Reason: The beta needs real enforcement without forcing Stripe subscriptions before pricing is finalized. Keeping the source of truth in plan entitlements lets packaging change without code edits.

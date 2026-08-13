@@ -12,6 +12,7 @@ import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createNotificationForUser } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { organizationHasCapability } from "@/lib/subscription-gates";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   availableProfessionalSelectionSchema,
@@ -113,6 +114,21 @@ export async function postOfficeShift(
     return { ok: false, message: "Complete your office setup before posting shifts." };
   }
 
+  if (!isSupabaseServiceRoleConfigured()) {
+    return { ok: false, message: "Server configuration is required before subscription gates can be checked." };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const canPostShifts = await organizationHasCapability(
+    admin,
+    organizationMembership.organization_id,
+    "post_shifts"
+  );
+
+  if (!canPostShifts) {
+    return { ok: false, message: "Your current office plan does not include shift posting." };
+  }
+
   const shift = parsed.data;
   const [locationResult, roleResult] = await Promise.all([
     supabase
@@ -185,6 +201,17 @@ export async function updateOfficeShift(
 
   if (!organizationId) {
     return { ok: false, message: "Complete your office setup before editing shifts." };
+  }
+
+  if (!isSupabaseServiceRoleConfigured()) {
+    return { ok: false, message: "Server configuration is required before subscription gates can be checked." };
+  }
+
+  const admin = createSupabaseAdminClient();
+  const canPostShifts = await organizationHasCapability(admin, organizationId, "post_shifts");
+
+  if (!canPostShifts) {
+    return { ok: false, message: "Your current office plan does not include shift posting." };
   }
 
   const shift = parsed.data;
@@ -286,6 +313,17 @@ export async function acceptInterestedProfessional(formData: FormData) {
     redirect("/office/dashboard");
   }
 
+  const admin = createSupabaseAdminClient();
+  const canRequestProfessionals = await organizationHasCapability(
+    admin,
+    organizationId,
+    "request_professionals"
+  );
+
+  if (!canRequestProfessionals) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=plan_required`);
+  }
+
   const { data } = await supabase
     .from("bookings")
     .select(
@@ -302,7 +340,6 @@ export async function acceptInterestedProfessional(formData: FormData) {
     redirect(`/office/shifts/${parsed.data.shiftId}?selection=unavailable`);
   }
 
-  const admin = createSupabaseAdminClient();
   const now = new Date().toISOString();
   const hasConflict = await professionalHasBlockingConflict(admin, {
     endsAt: booking.agreed_ends_at,
@@ -418,6 +455,16 @@ export async function selectAvailableProfessional(formData: FormData) {
   }
 
   const admin = createSupabaseAdminClient();
+  const canRequestProfessionals = await organizationHasCapability(
+    admin,
+    organizationId,
+    "request_professionals"
+  );
+
+  if (!canRequestProfessionals) {
+    redirect(`/office/shifts/${parsed.data.shiftId}?selection=plan_required`);
+  }
+
   const [{ data: professionalData }, { data: existingBookingData }, { data: availabilityData }] =
     await Promise.all([
       admin

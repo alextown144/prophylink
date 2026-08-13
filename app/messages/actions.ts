@@ -6,6 +6,7 @@ import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createNotificationForUser } from "@/lib/notifications";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { userHasCapability } from "@/lib/subscription-gates";
 import type { Database } from "@/lib/supabase/database.types";
 import {
   bookingConversationSchema,
@@ -55,6 +56,12 @@ export async function startBookingConversation(formData: FormData) {
   }
 
   const admin = createSupabaseAdminClient();
+  const canMessage = await userHasCapability(admin, user.id, "messaging");
+
+  if (!canMessage) {
+    redirect("/messages?status=plan_required");
+  }
+
   const booking = await getBookingForConversation(admin, parsed.data.bookingId);
 
   if (!booking) {
@@ -89,6 +96,12 @@ export async function sendConversationMessage(formData: FormData) {
   }
 
   const admin = createSupabaseAdminClient();
+  const canMessage = await userHasCapability(admin, user.id, "messaging");
+
+  if (!canMessage) {
+    redirect(`/messages/${parsed.data.conversationId}?status=plan_required`);
+  }
+
   const members = await getConversationMembers(admin, parsed.data.conversationId);
 
   if (!members.some((member) => member.user_id === user.id)) {

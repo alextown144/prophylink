@@ -419,6 +419,7 @@ function InterestMessage({ status }: { status: string }) {
       already_sent: "You already sent interest for that shift.",
       failed: "Interest could not be sent. Try again.",
       conflict: "That shift conflicts with an accepted or confirmed shift already on your schedule.",
+      plan_required: "Your current professional plan does not include sending shift interest.",
       profile_required: "Complete your professional profile before sending interest.",
       sent: "Interest sent. The office can now see your response.",
       service_required: "Server configuration is required before interest can be sent.",

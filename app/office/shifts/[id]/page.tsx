@@ -664,6 +664,7 @@ function StatusMessage({
           conflict: "That professional already has an accepted or confirmed shift during this time.",
           failed: "Professional could not be accepted. Try again.",
           no_availability: "That professional is no longer available for the full shift.",
+          plan_required: "Your current office plan does not include this marketplace action.",
           service_required: "Server configuration is required before accepting professionals.",
           selected: "Professional selected. They can now confirm or decline the shift.",
           unavailable: "That interest response is no longer available."

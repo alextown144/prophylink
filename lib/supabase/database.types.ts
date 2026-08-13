@@ -430,6 +430,82 @@ export type Database = {
           updated_at?: string;
         }
       >;
+      subscription_plans: Table<
+        {
+          id: string;
+          code: string;
+          name: string;
+          account_kind: Database["public"]["Enums"]["account_kind"];
+          stripe_price_env_key: string | null;
+          entitlements: Json;
+          enabled: boolean;
+          created_at: string;
+        },
+        {
+          id?: string;
+          code: string;
+          name: string;
+          account_kind: Database["public"]["Enums"]["account_kind"];
+          stripe_price_env_key?: string | null;
+          entitlements?: Json;
+          enabled?: boolean;
+          created_at?: string;
+        },
+        {
+          id?: string;
+          code?: string;
+          name?: string;
+          account_kind?: Database["public"]["Enums"]["account_kind"];
+          stripe_price_env_key?: string | null;
+          entitlements?: Json;
+          enabled?: boolean;
+          created_at?: string;
+        }
+      >;
+      subscriptions: Table<
+        {
+          id: string;
+          user_id: string | null;
+          organization_id: string | null;
+          plan_id: string;
+          stripe_customer_id: string | null;
+          stripe_subscription_id: string | null;
+          status: Database["public"]["Enums"]["subscription_status"];
+          trial_ends_at: string | null;
+          current_period_ends_at: string | null;
+          cancel_at_period_end: boolean;
+          created_at: string;
+          updated_at: string;
+        },
+        {
+          id?: string;
+          user_id?: string | null;
+          organization_id?: string | null;
+          plan_id: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          status?: Database["public"]["Enums"]["subscription_status"];
+          trial_ends_at?: string | null;
+          current_period_ends_at?: string | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        },
+        {
+          id?: string;
+          user_id?: string | null;
+          organization_id?: string | null;
+          plan_id?: string;
+          stripe_customer_id?: string | null;
+          stripe_subscription_id?: string | null;
+          status?: Database["public"]["Enums"]["subscription_status"];
+          trial_ends_at?: string | null;
+          current_period_ends_at?: string | null;
+          cancel_at_period_end?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        }
+      >;
       signup_invitations: Table<
         {
           id: string;

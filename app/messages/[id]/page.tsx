@@ -269,6 +269,7 @@ function StatusMessage({ status }: { status?: string }) {
   const message =
     {
       failed: "Message could not be sent. Try again.",
+      plan_required: "Your current plan does not include booking messaging.",
       sent: "Message sent.",
       service_required: "Server configuration is required before messaging can be used."
     }[status ?? ""] ?? null;

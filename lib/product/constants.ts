@@ -21,16 +21,23 @@ export const tricities = [
 ] as const;
 
 export const subscriptionCapabilities = [
-  "professional_profile",
+  "profile",
   "availability",
   "browse_shifts",
+  "receive_invitations",
+  "express_interest",
   "coverage_exchange",
   "coverage_circle",
+  "advanced_alerts",
   "office_profile",
   "professional_search",
   "post_shifts",
+  "request_professionals",
   "messaging",
+  "favorites",
   "multiple_locations",
-  "advanced_alerts",
-  "marketplace_analytics"
+  "analytics",
+  "preferred_roster"
 ] as const;
+
+export type SubscriptionCapability = (typeof subscriptionCapabilities)[number];
