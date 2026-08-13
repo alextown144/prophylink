@@ -188,9 +188,13 @@ function getNotificationTargetHref(notification: Notification) {
   }
 
   if (
-    ["shift_accepted", "shift_selected", "shift_cancelled", "shift_completed"].includes(
-      notification.type
-    )
+    [
+      "shift_accepted",
+      "shift_match",
+      "shift_selected",
+      "shift_cancelled",
+      "shift_completed"
+    ].includes(notification.type)
   ) {
     return "/professional/shifts";
   }

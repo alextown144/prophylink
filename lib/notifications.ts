@@ -72,6 +72,7 @@ const emailNotificationTypes = new Set([
   "shift_confirmed",
   "shift_declined",
   "shift_interest",
+  "shift_match",
   "shift_selected"
 ]);
 
@@ -133,6 +134,7 @@ function notificationDestination(notification: NotificationRow) {
 
   if (
     notification.type === "shift_accepted" ||
+    notification.type === "shift_match" ||
     notification.type === "shift_selected" ||
     notification.type === "shift_cancelled" ||
     notification.type === "shift_completed"

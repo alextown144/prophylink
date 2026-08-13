@@ -10,6 +10,7 @@ import { blockingBookingStatuses } from "@/lib/booking-conflicts";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
 import { createNotificationForUser } from "@/lib/notifications";
+import { getAvailableProfessionalsForShift } from "@/lib/shift-matching";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { organizationHasCapability } from "@/lib/subscription-gates";
@@ -60,6 +61,11 @@ type ProfessionalUserRef = {
   user_id: string;
 };
 
+type ProfessionalRoleRef = {
+  id: string;
+  name: string;
+};
+
 type ShiftForProfessionalSelection = {
   id: string;
   organization_id: string;
@@ -69,6 +75,14 @@ type ShiftForProfessionalSelection = {
   starts_at: string;
   ends_at: string;
   hourly_rate_cents: number | null;
+};
+
+type PostedShiftForMatching = {
+  id: string;
+  professional_role_id: string;
+  status: "draft" | "open" | "pending" | "filled" | "completed" | "cancelled";
+  starts_at: string;
+  ends_at: string;
 };
 
 type ProfessionalForSelection = {
@@ -139,7 +153,7 @@ export async function postOfficeShift(
       .maybeSingle(),
     supabase
       .from("professional_roles")
-      .select("id")
+      .select("id, name")
       .eq("id", shift.professionalRoleId)
       .eq("enabled", true)
       .maybeSingle()
@@ -149,7 +163,9 @@ export async function postOfficeShift(
     return { ok: false, message: "Choose one of your saved office locations." };
   }
 
-  if (!roleResult.data) {
+  const professionalRole = roleResult.data as ProfessionalRoleRef | null;
+
+  if (!professionalRole) {
     return { ok: false, message: "Choose an available professional role." };
   }
 
@@ -171,15 +187,31 @@ export async function postOfficeShift(
     arrival_instructions: shift.arrivalInstructions || null
   };
 
-  const { error } = await supabase.from("shifts").insert([payload] as never[]);
+  const { data: postedShiftData, error } = await supabase
+    .from("shifts")
+    .insert([payload] as never[])
+    .select("id, professional_role_id, status, starts_at, ends_at")
+    .single();
 
-  if (error) {
+  if (error || !postedShiftData) {
     return { ok: false, message: "Shift could not be posted." };
+  }
+
+  const postedShift = postedShiftData as PostedShiftForMatching;
+
+  if (postedShift.status === "open") {
+    await notifyAvailableProfessionalsForPostedShift(admin, {
+      roleName: professionalRole.name,
+      shift: postedShift
+    });
   }
 
   revalidatePath("/office/dashboard");
   revalidatePath("/office/shifts/new");
-  redirect("/office/dashboard");
+  revalidatePath("/professional/shifts");
+  revalidatePath("/professional/dashboard");
+  revalidatePath("/notifications");
+  redirect(`/office/shifts/${postedShift.id}?posted=1`);
 }
 
 export async function updateOfficeShift(
@@ -762,6 +794,30 @@ async function professionalHasBlockingConflict(
   return Boolean(data);
 }
 
+async function notifyAvailableProfessionalsForPostedShift(
+  admin: ReturnType<typeof createSupabaseAdminClient>,
+  {
+    roleName,
+    shift
+  }: {
+    roleName: string;
+    shift: PostedShiftForMatching;
+  }
+) {
+  const matches = await getAvailableProfessionalsForShift(admin, shift, 20);
+
+  await Promise.all(
+    matches.map((professional) =>
+      createNotificationForUser(admin, professional.userId, {
+        body: `A ${roleName} shift matches your saved availability for ${formatShiftWindow(shift.starts_at, shift.ends_at)}.`,
+        metadata: { shift_id: shift.id },
+        title: "New matching shift available",
+        type: "shift_match"
+      })
+    )
+  );
+}
+
 function localPacificDateTimeToIso(date: string, time: string) {
   const [year, month, day] = date.split("-").map(Number);
   const [hour, minute] = time.split(":").map(Number);
@@ -769,6 +825,20 @@ function localPacificDateTimeToIso(date: string, time: string) {
   const offset = getTimeZoneOffsetMs(new Date(utcGuess), timezone);
 
   return new Date(utcGuess - offset).toISOString();
+}
+
+function formatShiftWindow(startsAt: string, endsAt: string) {
+  const day = new Intl.DateTimeFormat("en-US", {
+    dateStyle: "medium",
+    timeZone: timezone
+  }).format(new Date(startsAt));
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: timezone
+  });
+
+  return `${day}, ${formatter.format(new Date(startsAt))} - ${formatter.format(new Date(endsAt))}`;
 }
 
 function getTimeZoneOffsetMs(date: Date, timeZone: string) {

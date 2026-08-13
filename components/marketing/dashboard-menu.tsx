@@ -24,6 +24,7 @@ export function DashboardMenu() {
   const router = useRouter();
   const supabaseConfigured = isSupabaseConfigured();
   const [email, setEmail] = useState<string | null>(null);
+  const [open, setOpen] = useState(false);
   const [roles, setRoles] = useState<AccountKind[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(supabaseConfigured);
@@ -90,13 +91,22 @@ export function DashboardMenu() {
 
   async function handleSignOut() {
     const supabase = createSupabaseBrowserClient();
+    setOpen(false);
     await supabase.auth.signOut();
     router.refresh();
     router.push("/");
   }
 
+  function handleNavigate() {
+    setOpen(false);
+  }
+
   return (
-    <details className="group relative shrink-0">
+    <details
+      className="group relative shrink-0"
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      open={open}
+    >
       <summary className="focus-ring flex h-11 cursor-pointer list-none items-center gap-2 rounded-lg bg-[#00B3A4] px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#008F85] sm:h-10 sm:px-4 [&::-webkit-details-marker]:hidden">
         <LayoutDashboard className="h-4 w-4" />
         Dashboard
@@ -111,6 +121,7 @@ export function DashboardMenu() {
           <Link
             className="focus-ring flex items-center justify-between gap-3 px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"
             href="/notifications"
+            onClick={handleNavigate}
           >
             <span>
               <span className="flex items-center gap-2 font-semibold text-slate-950">
@@ -128,6 +139,7 @@ export function DashboardMenu() {
           <Link
             className="focus-ring px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"
             href="/messages"
+            onClick={handleNavigate}
           >
             <span className="block font-semibold text-slate-950">Messages</span>
             <span className="text-xs text-slate-500">Booking conversations</span>
@@ -137,6 +149,7 @@ export function DashboardMenu() {
               className="focus-ring px-4 py-2 text-sm text-slate-700 transition-colors hover:bg-teal-50 hover:text-teal-800"
               href={link.href}
               key={link.href}
+              onClick={handleNavigate}
             >
               <span className="block font-semibold text-slate-950">{link.label}</span>
               <span className="text-xs text-slate-500">{link.section}</span>

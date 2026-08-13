@@ -16,18 +16,13 @@ import {
 } from "@/app/office/shifts/actions";
 import { startBookingConversation } from "@/app/messages/actions";
 import { getOfficeOrganizationId } from "@/app/office/shifts/data";
-import {
-  availabilityRuleCoversShift,
-  availabilityRuleOverlapsShift,
-  formatTimeRange,
-  parseWeeklyRecurrenceDays,
-  type AvailabilityWindowRule
-} from "@/lib/availability";
-import { blockingBookingStatuses } from "@/lib/booking-conflicts";
 import { requireUser } from "@/lib/auth/session";
 import { isSupabaseServiceRoleConfigured } from "@/lib/config/server-env";
+import {
+  getAvailableProfessionalsForShift,
+  type AvailableProfessionalMatch
+} from "@/lib/shift-matching";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
-import type { Database } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { BookingStatusTimeline } from "@/components/booking/booking-status-timeline";
@@ -40,6 +35,7 @@ type PageProps = {
   }>;
   searchParams: Promise<{
     lifecycle?: string;
+    posted?: string;
     selection?: string;
     updated?: string;
   }>;
@@ -69,51 +65,6 @@ type OfficeShiftDetail = {
     name: string;
   } | null;
 };
-
-type AvailableProfessional = {
-  id: string;
-  availabilityLabel: string;
-  displayName: string;
-  email: string;
-  city: string | null;
-  state: string | null;
-  roleName: string | null;
-  hourlyRateCents: number | null;
-  preferredRadiusMiles: number | string | null;
-  shortBio: string | null;
-  yearsExperience: number | string | null;
-  existingBookingStatus: ShiftBooking["status"] | null;
-};
-
-type CandidateProfile = {
-  id: string;
-  user_id: string;
-  professional_role_id: string;
-  hourly_rate_cents: number | null;
-  preferred_radius_miles: number | string | null;
-  short_bio: string | null;
-  years_experience: number | string | null;
-  user_profiles: {
-    display_name: string | null;
-    email: string;
-    city: string | null;
-    state: string | null;
-  } | null;
-  professional_roles: {
-    name: string;
-  } | null;
-};
-
-type CandidateBooking = {
-  professional_profile_id: string;
-  status: ShiftBooking["status"];
-};
-
-type CandidateBlockingBooking = {
-  professional_profile_id: string;
-};
-
-type AvailabilityRule = Database["public"]["Tables"]["availability_rules"]["Row"];
 
 type ShiftBooking = {
   id: string;
@@ -191,6 +142,7 @@ export default async function OfficeShiftDetailPage({
 
       <StatusMessage
         lifecycle={messages.lifecycle}
+        posted={messages.posted}
         selection={messages.selection}
         updated={messages.updated}
       />
@@ -299,7 +251,7 @@ async function getOfficeShiftDetail(userId: string, shiftId: string) {
   const matchingConfigured = isSupabaseServiceRoleConfigured();
   const availableProfessionals =
     shift && matchingConfigured
-      ? await getAvailableProfessionalsForShift(shift)
+      ? await getAvailableProfessionalsForShift(createSupabaseAdminClient(), shift)
       : [];
 
   return {
@@ -308,101 +260,6 @@ async function getOfficeShiftDetail(userId: string, shiftId: string) {
     matchingConfigured,
     shift
   };
-}
-
-async function getAvailableProfessionalsForShift(shift: OfficeShiftDetail) {
-  if (shift.status !== "open") {
-    return [];
-  }
-
-  const admin = createSupabaseAdminClient();
-  const { data: profileData } = await admin
-    .from("professional_profiles")
-    .select(
-      "id, user_id, professional_role_id, hourly_rate_cents, preferred_radius_miles, short_bio, years_experience, user_profiles(display_name, email, city, state), professional_roles(name)"
-    )
-    .eq("professional_role_id", shift.professional_role_id)
-    .eq("profile_visibility", "marketplace")
-    .limit(30);
-  const profiles = (profileData ?? []) as CandidateProfile[];
-  const profileIds = profiles.map((profile) => profile.id);
-
-  if (profileIds.length === 0) {
-    return [];
-  }
-
-  const [availabilityResult, bookingsResult, blockingBookingsResult] = await Promise.all([
-    admin
-      .from("availability_rules")
-      .select(
-        "id, professional_profile_id, kind, starts_at, ends_at, all_day, recurrence_rule, recurrence_starts_on, recurrence_ends_on, timezone, notes, created_at, updated_at"
-      )
-      .in("professional_profile_id", profileIds),
-    admin
-      .from("bookings")
-      .select("professional_profile_id, status")
-      .eq("shift_id", shift.id)
-      .in("professional_profile_id", profileIds),
-    admin
-      .from("bookings")
-      .select("professional_profile_id")
-      .in("professional_profile_id", profileIds)
-      .in("status", [...blockingBookingStatuses])
-      .lt("agreed_starts_at", shift.ends_at)
-      .gt("agreed_ends_at", shift.starts_at)
-  ]);
-  const rulesByProfileId = new Map<string, AvailabilityRule[]>();
-  const bookingStatusByProfileId = new Map<string, ShiftBooking["status"]>();
-  const conflictingProfileIds = new Set(
-    ((blockingBookingsResult.data ?? []) as CandidateBlockingBooking[]).map(
-      (booking) => booking.professional_profile_id
-    )
-  );
-
-  ((availabilityResult.data ?? []) as AvailabilityRule[]).forEach((rule) => {
-    rulesByProfileId.set(rule.professional_profile_id, [
-      ...(rulesByProfileId.get(rule.professional_profile_id) ?? []),
-      rule
-    ]);
-  });
-  ((bookingsResult.data ?? []) as CandidateBooking[]).forEach((booking) => {
-    bookingStatusByProfileId.set(booking.professional_profile_id, booking.status);
-  });
-
-  return profiles
-    .map((profile) => {
-      const rules = rulesByProfileId.get(profile.id) ?? [];
-      const matchingRule = rules
-        .filter((rule) => rule.kind === "available")
-        .find((rule) => availabilityRuleCoversShift(rule, shift.starts_at, shift.ends_at));
-      const hasUnavailableConflict = rules
-        .filter((rule) => rule.kind === "unavailable")
-        .some((rule) => availabilityRuleOverlapsShift(rule, shift.starts_at, shift.ends_at));
-
-      if (!matchingRule || hasUnavailableConflict || conflictingProfileIds.has(profile.id)) {
-        return null;
-      }
-
-      return {
-        availabilityLabel: formatAvailabilityLabel(matchingRule),
-        city: profile.user_profiles?.city ?? null,
-        displayName:
-          profile.user_profiles?.display_name ??
-          profile.user_profiles?.email ??
-          "Professional",
-        email: profile.user_profiles?.email ?? "Email not saved",
-        existingBookingStatus: bookingStatusByProfileId.get(profile.id) ?? null,
-        hourlyRateCents: profile.hourly_rate_cents,
-        id: profile.id,
-        preferredRadiusMiles: profile.preferred_radius_miles,
-        roleName: profile.professional_roles?.name ?? null,
-        shortBio: profile.short_bio,
-        state: profile.user_profiles?.state ?? null,
-        yearsExperience: profile.years_experience
-      };
-    })
-    .filter((profile): profile is AvailableProfessional => Boolean(profile))
-    .slice(0, 12);
 }
 
 function InterestedProfessionalCard({
@@ -531,7 +388,7 @@ function AvailableProfessionalsCard({
   shiftStatus
 }: {
   matchingConfigured: boolean;
-  professionals: AvailableProfessional[];
+  professionals: AvailableProfessionalMatch[];
   shiftId: string;
   shiftStatus: OfficeShiftDetail["status"];
 }) {
@@ -582,7 +439,7 @@ function AvailableProfessionalCard({
   professional,
   shiftId
 }: {
-  professional: AvailableProfessional;
+  professional: AvailableProfessionalMatch;
   shiftId: string;
 }) {
   const profileFacts = [
@@ -644,15 +501,19 @@ function AvailableProfessionalCard({
 
 function StatusMessage({
   lifecycle,
+  posted,
   selection,
   updated
 }: {
   lifecycle?: string;
+  posted?: string;
   selection?: string;
   updated?: string;
 }) {
   const message =
-    updated === "1"
+    posted === "1"
+      ? "Shift posted. Matching professionals with saved availability are listed below and have been notified."
+      : updated === "1"
       ? "Shift updated."
       : lifecycle
         ? {
@@ -744,13 +605,6 @@ function formatYears(value?: number | string | null) {
 
 function formatRadius(value?: number | string | null) {
   return value ? `${value} miles` : null;
-}
-
-function formatAvailabilityLabel(rule: AvailabilityWindowRule) {
-  const recurringDays = parseWeeklyRecurrenceDays(rule.recurrence_rule);
-  const window = formatTimeRange(rule.starts_at, rule.ends_at);
-
-  return recurringDays.length > 0 ? `${recurringDays.join(", ")} ${window}` : window;
 }
 
 function formatStatus(status: OfficeShiftDetail["status"] | ShiftBooking["status"]) {
