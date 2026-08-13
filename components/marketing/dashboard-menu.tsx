@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Bell, ChevronDown, LayoutDashboard, LogOut } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/config/env";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,7 @@ type DashboardLink = {
 
 export function DashboardMenu() {
   const router = useRouter();
+  const pathname = usePathname();
   const supabaseConfigured = isSupabaseConfigured();
   const [email, setEmail] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -29,50 +30,72 @@ export function DashboardMenu() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(supabaseConfigured);
 
-  useEffect(() => {
+  const loadSessionMenu = useCallback(async () => {
     if (!supabaseConfigured) {
       return;
     }
 
     const supabase = createSupabaseBrowserClient();
 
-    async function loadSessionMenu() {
-      const {
-        data: { user }
-      } = await supabase.auth.getUser();
+    const {
+      data: { user }
+    } = await supabase.auth.getUser();
 
-      if (!user) {
-        setEmail(null);
-        setRoles([]);
-        setUnreadCount(0);
-        setLoading(false);
-        return;
-      }
-
-      const [{ data }, { count }] = await Promise.all([
-        supabase.from("account_roles").select("kind"),
-        supabase
-          .from("notifications")
-          .select("id", { count: "exact", head: true })
-          .is("read_at", null)
-      ]);
-      const nextRoles = ((data ?? []) as AccountRole[]).map((role) => role.kind);
-
-      setEmail(user.email ?? "Signed in");
-      setRoles(nextRoles);
-      setUnreadCount(count ?? 0);
+    if (!user) {
+      setEmail(null);
+      setRoles([]);
+      setUnreadCount(0);
       setLoading(false);
+      return;
     }
 
-    void loadSessionMenu();
+    const [{ data: rolesData }, { count }] = await Promise.all([
+      supabase.from("account_roles").select("kind").eq("user_id", user.id),
+      supabase
+        .from("notifications")
+        .select("id", { count: "exact", head: true })
+        .eq("user_id", user.id)
+        .is("read_at", null)
+    ]);
+    const nextRoles = ((rolesData ?? []) as AccountRole[]).map((role) => role.kind);
+
+    setEmail(user.email ?? "Signed in");
+    setRoles(nextRoles);
+    setUnreadCount(count ?? 0);
+    setLoading(false);
+  }, [supabaseConfigured]);
+
+  useEffect(() => {
+    if (!supabaseConfigured) {
+      return;
+    }
+
+    const refreshSoon = window.setTimeout(() => {
+      void loadSessionMenu();
+    }, 0);
+    const supabase = createSupabaseBrowserClient();
     const { data } = supabase.auth.onAuthStateChange(() => {
       void loadSessionMenu();
     });
+    const refreshOnFocus = () => {
+      void loadSessionMenu();
+    };
+    const refreshOnVisible = () => {
+      if (document.visibilityState === "visible") {
+        void loadSessionMenu();
+      }
+    };
+
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshOnVisible);
 
     return () => {
+      window.clearTimeout(refreshSoon);
       data.subscription.unsubscribe();
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshOnVisible);
     };
-  }, [supabaseConfigured]);
+  }, [loadSessionMenu, pathname, supabaseConfigured]);
 
   if (loading || !email) {
     return (
@@ -104,7 +127,14 @@ export function DashboardMenu() {
   return (
     <details
       className="group relative shrink-0"
-      onToggle={(event) => setOpen(event.currentTarget.open)}
+      onToggle={(event) => {
+        const nextOpen = event.currentTarget.open;
+        setOpen(nextOpen);
+
+        if (nextOpen) {
+          void loadSessionMenu();
+        }
+      }}
       open={open}
     >
       <summary className="focus-ring flex h-11 cursor-pointer list-none items-center gap-2 rounded-lg bg-[#00B3A4] px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#008F85] sm:h-10 sm:px-4 [&::-webkit-details-marker]:hidden">
