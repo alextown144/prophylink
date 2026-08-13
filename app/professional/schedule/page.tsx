@@ -15,6 +15,7 @@ type ProfessionalProfile = {
 
 type ScheduleBooking = {
   id: string;
+  shift_id: string | null;
   cancelled_reason: string | null;
   completed_at: string | null;
   confirmed_at: string | null;
@@ -42,19 +43,24 @@ type ScheduleBooking = {
     state: string;
     postal_code: string;
   } | null;
-  professional_roles: {
-    name: string;
+  shifts: {
+    professional_roles: {
+      name: string;
+    } | null;
   } | null;
 };
 
 export default async function ProfessionalSchedulePage() {
   const user = await requireUser();
-  const { bookings, professionalProfile } = await getProfessionalScheduleData(user.id);
+  const { bookings, loadError, professionalProfile } = await getProfessionalScheduleData(user.id);
   const activeBookings = bookings.filter((booking) =>
     ["accepted", "confirmed"].includes(booking.status)
   );
+  const responseBookings = bookings.filter((booking) =>
+    ["interested", "invited", "requested", "pending_office_approval"].includes(booking.status)
+  );
   const historyBookings = bookings.filter(
-    (booking) => !["accepted", "confirmed"].includes(booking.status)
+    (booking) => ["declined", "cancelled", "completed"].includes(booking.status)
   );
 
   return (
@@ -91,7 +97,17 @@ export default async function ProfessionalSchedulePage() {
         </div>
       </div>
 
-      {!professionalProfile ? (
+      {loadError ? (
+        <Card>
+          <CardContent className="p-6">
+            <p className="font-semibold text-slate-950">Schedule could not be loaded</p>
+            <p className="mt-2 leading-7 text-slate-600">
+              We could not load your shift commitments right now. Please refresh
+              the page, or come back from the dashboard.
+            </p>
+          </CardContent>
+        </Card>
+      ) : !professionalProfile ? (
         <Card>
           <CardContent className="p-6">
             <p className="font-semibold text-slate-950">Profile setup needed</p>
@@ -123,23 +139,43 @@ export default async function ProfessionalSchedulePage() {
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle>Recent responses</CardTitle>
-            </CardHeader>
-            <CardContent className="grid gap-3">
-              {historyBookings.length > 0 ? (
-                historyBookings.slice(0, 8).map((booking) => (
-                  <ScheduleBookingCard booking={booking} key={booking.id} compact />
-                ))
-              ) : (
-                <EmptyState
-                  title="No response history yet"
-                  text="Declined, completed, and cancelled responses will appear here."
-                />
-              )}
-            </CardContent>
-          </Card>
+          <div className="grid gap-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Responses in progress</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {responseBookings.length > 0 ? (
+                  responseBookings.slice(0, 8).map((booking) => (
+                    <ScheduleBookingCard booking={booking} key={booking.id} compact />
+                  ))
+                ) : (
+                  <EmptyState
+                    title="No open responses"
+                    text="Shifts you expressed interest in, requested, or were invited to will appear here."
+                  />
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Recent history</CardTitle>
+              </CardHeader>
+              <CardContent className="grid gap-3">
+                {historyBookings.length > 0 ? (
+                  historyBookings.slice(0, 8).map((booking) => (
+                    <ScheduleBookingCard booking={booking} key={booking.id} compact />
+                  ))
+                ) : (
+                  <EmptyState
+                    title="No completed history yet"
+                    text="Declined, completed, and cancelled responses will appear here."
+                  />
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </section>
       )}
     </main>
@@ -148,29 +184,62 @@ export default async function ProfessionalSchedulePage() {
 
 async function getProfessionalScheduleData(userId: string) {
   const supabase = await createSupabaseServerClient();
-  const { data: professionalProfileData } = await supabase
+  const { data: professionalProfileData, error: professionalProfileError } = await supabase
     .from("professional_profiles")
     .select("id")
     .eq("user_id", userId)
     .maybeSingle();
+
+  if (professionalProfileError) {
+    console.warn("[professional-schedule] Profile lookup failed.", {
+      error: professionalProfileError.message,
+      userId
+    });
+
+    return {
+      bookings: [] as ScheduleBooking[],
+      loadError: true,
+      professionalProfile: null
+    };
+  }
+
   const professionalProfile = professionalProfileData as ProfessionalProfile | null;
 
   if (!professionalProfile) {
-    return { bookings: [] as ScheduleBooking[], professionalProfile: null };
+    return {
+      bookings: [] as ScheduleBooking[],
+      loadError: false,
+      professionalProfile: null
+    };
   }
 
-  const { data } = await supabase
+  const { data, error: bookingsError } = await supabase
     .from("bookings")
     .select(
-      "id, cancelled_reason, completed_at, confirmed_at, created_at, status, agreed_starts_at, agreed_ends_at, agreed_hourly_rate_cents, organizations(name), office_locations(name, address_line1, city, state, postal_code), professional_roles(name)"
+      "id, shift_id, cancelled_reason, completed_at, confirmed_at, created_at, status, agreed_starts_at, agreed_ends_at, agreed_hourly_rate_cents, organizations(name), office_locations(name, address_line1, city, state, postal_code), shifts(professional_roles(name))"
     )
     .eq("professional_profile_id", professionalProfile.id)
     .gte("agreed_ends_at", new Date().toISOString())
     .order("agreed_starts_at", { ascending: true })
     .limit(30);
 
+  if (bookingsError) {
+    console.warn("[professional-schedule] Booking lookup failed.", {
+      error: bookingsError.message,
+      professionalProfileId: professionalProfile.id,
+      userId
+    });
+
+    return {
+      bookings: [] as ScheduleBooking[],
+      loadError: true,
+      professionalProfile
+    };
+  }
+
   return {
     bookings: (data ?? []) as ScheduleBooking[],
+    loadError: false,
     professionalProfile
   };
 }
@@ -183,6 +252,7 @@ function ScheduleBookingCard({
   compact?: boolean;
 }) {
   const canMessage = ["accepted", "confirmed"].includes(booking.status);
+  const roleName = booking.shifts?.professional_roles?.name;
 
   return (
     <div className="rounded-lg border bg-white p-4">
@@ -199,6 +269,9 @@ function ScheduleBookingCard({
           <h2 className="mt-3 font-semibold text-slate-950">
             {booking.organizations?.name ?? "Dental office"}
           </h2>
+          {roleName ? (
+            <p className="mt-1 text-sm font-semibold text-slate-600">{roleName}</p>
+          ) : null}
         </div>
         <div className="grid gap-2 sm:flex sm:flex-wrap">
           <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
