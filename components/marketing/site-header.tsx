@@ -13,9 +13,9 @@ const navItems = [
 export function SiteHeader() {
   return (
     <header className="sticky top-0 z-40 border-b border-[#E2E8F0] bg-white shadow-sm">
-      <div className="container flex min-h-20 items-center justify-between gap-4 py-3">
-        <Link className="focus-ring rounded-sm" href="/">
-          <BrandLogo markClassName="h-11 w-11" />
+      <div className="container flex min-h-20 items-center justify-between gap-3 py-3 sm:gap-4">
+        <Link className="focus-ring min-w-0 rounded-sm" href="/">
+          <BrandLogo className="min-w-0" markClassName="h-10 w-10 sm:h-11 sm:w-11" />
         </Link>
         <nav className="hidden items-center gap-8 text-sm font-semibold text-[#0B132B] lg:flex">
           {navItems.map((item) => (

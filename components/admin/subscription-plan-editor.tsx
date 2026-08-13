@@ -44,7 +44,7 @@ function SubscriptionPlanCard({ plan }: { plan: SubscriptionPlanEditorRow }) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+        <CardTitle className="flex items-center gap-2 leading-7">
           <SlidersHorizontal className="h-5 w-5 text-teal-700" />
           {plan.name}
         </CardTitle>
@@ -74,7 +74,7 @@ function SubscriptionPlanCard({ plan }: { plan: SubscriptionPlanEditorRow }) {
               {state.message}
             </p>
           ) : null}
-          <div className="flex flex-wrap items-center justify-between gap-3">
+          <div className="grid gap-3 sm:flex sm:flex-wrap sm:items-center sm:justify-between">
             <Badge variant={plan.enabled ? "default" : "outline"}>
               {plan.enabled ? "Enabled" : "Disabled"}
             </Badge>
@@ -95,9 +95,11 @@ function CapabilityCheckbox({
 }) {
   return (
     <label className="flex min-h-11 items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 text-sm">
-      <span className="font-semibold text-slate-800">{formatCapability(capability)}</span>
+      <span className="min-w-0 font-semibold text-slate-800">
+        {formatCapability(capability)}
+      </span>
       <input
-        className="h-4 w-4 accent-teal-700"
+        className="h-4 w-4 shrink-0 accent-teal-700"
         defaultChecked={checked}
         name="capabilities"
         type="checkbox"
@@ -111,7 +113,7 @@ function SubmitButton() {
   const { pending } = useFormStatus();
 
   return (
-    <Button disabled={pending} size="sm" type="submit">
+    <Button className="w-full sm:w-auto" disabled={pending} size="sm" type="submit">
       {pending ? "Saving..." : "Save gates"}
     </Button>
   );

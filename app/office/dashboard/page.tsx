@@ -92,29 +92,29 @@ export default async function OfficeDashboardPage() {
             search, location management, and subscription access controls.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild>
+        <div className="grid gap-3 sm:flex sm:flex-wrap">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/office/shifts/new">
               <CalendarPlus className="h-4 w-4" />
               Post a shift
             </Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/office/schedule">
               <CalendarCheck className="h-4 w-4" />
               Schedule
             </Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/office/profile">
               {organization ? "Edit office profile" : "Finish setup"}
             </Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/office/locations">Locations</Link>
           </Button>
           {isAdmin ? (
-            <Button asChild variant="outline">
+            <Button asChild className="w-full sm:w-auto" variant="outline">
               <Link href="/admin">Admin</Link>
             </Button>
           ) : null}
@@ -390,7 +390,7 @@ function StatusMetric({
     <Card>
       <CardContent className="flex min-h-32 flex-col justify-between p-5">
         <div className="text-teal-700">{icon}</div>
-        <div>
+        <div className="min-w-0">
           <p className="text-2xl font-semibold text-slate-950">{value}</p>
           <p className="mt-1 text-sm text-slate-600">{label}</p>
         </div>
@@ -433,7 +433,7 @@ function PostedShiftRow({ shift }: { shift: PostedShift }) {
             {shift.office_locations?.city}, {shift.office_locations?.state}
           </p>
         </div>
-        <div className="flex items-center gap-2 sm:flex-col sm:items-end">
+        <div className="grid gap-2 sm:flex sm:flex-col sm:items-end">
           <Badge variant={shift.status === "open" ? "default" : "outline"}>
             {formatStatus(shift.status)}
           </Badge>
@@ -451,12 +451,12 @@ function PostedShiftRow({ shift }: { shift: PostedShift }) {
               {formatStatus(shift.selected_booking.status)}
             </span>
           ) : null}
-          <div className="flex gap-2">
-            <Button asChild size="sm" variant="outline">
+          <div className="grid gap-2 sm:flex">
+            <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
               <Link href={`/office/shifts/${shift.id}`}>Review</Link>
             </Button>
             {shift.status === "draft" || shift.status === "open" ? (
-              <Button asChild size="sm" variant="ghost">
+              <Button asChild className="w-full sm:w-auto" size="sm" variant="ghost">
                 <Link href={`/office/shifts/${shift.id}/edit`}>Edit</Link>
               </Button>
             ) : null}

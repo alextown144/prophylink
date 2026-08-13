@@ -12,12 +12,12 @@ export function BrandLogo({
   showTagline?: boolean;
 }) {
   return (
-    <div className={cn("flex items-center gap-3", className)}>
+    <div className={cn("flex min-w-0 items-center gap-2 sm:gap-3", className)}>
       <LogoMark className={markClassName} />
-      <div className="leading-none">
+      <div className="min-w-0 leading-none">
         <p
           className={cn(
-            "font-heading text-2xl font-bold sm:text-3xl",
+            "font-heading text-xl font-bold sm:text-3xl",
             inverse ? "text-white" : "text-[#0B132B]"
           )}
         >
@@ -26,7 +26,7 @@ export function BrandLogo({
         {showTagline ? (
           <p
             className={cn(
-              "mt-1 text-xs font-medium sm:text-sm",
+              "mt-1 max-w-40 text-[0.72rem] font-medium leading-tight sm:max-w-none sm:text-sm",
               inverse ? "text-white" : "text-[#0B132B]"
             )}
           >

@@ -78,14 +78,14 @@ export default async function OfficeSchedulePage() {
             confirmed coverage across your locations.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild>
+        <div className="grid gap-3 sm:flex sm:flex-wrap">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/office/shifts/new">Post a shift</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/messages">Messages</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/office/dashboard">Posted shifts</Link>
           </Button>
         </div>
@@ -206,16 +206,16 @@ function OfficeScheduleBookingCard({
             </p>
           ) : null}
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid gap-2 sm:flex sm:flex-wrap">
           {booking.shift_id ? (
-            <Button asChild size="sm" variant="outline">
+            <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
               <Link href={`/office/shifts/${booking.shift_id}`}>Review</Link>
             </Button>
           ) : null}
           {canMessage ? (
-            <form action={startBookingConversation}>
+            <form action={startBookingConversation} className="w-full sm:w-auto">
               <input name="booking_id" type="hidden" value={booking.id} />
-              <Button size="sm" type="submit">
+              <Button className="w-full sm:w-auto" size="sm" type="submit">
                 Message
               </Button>
             </form>
@@ -257,9 +257,9 @@ function EmptyState({ text, title }: { text: string; title: string }) {
 
 function IconFact({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <p className="flex items-start gap-2">
-      <span className="mt-0.5 text-teal-700">{icon}</span>
-      <span>{text}</span>
+    <p className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-teal-700">{icon}</span>
+      <span className="min-w-0 break-words">{text}</span>
     </p>
   );
 }

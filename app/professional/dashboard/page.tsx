@@ -128,21 +128,21 @@ export default async function ProfessionalDashboardPage() {
             setup tasks.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild>
+        <div className="grid gap-3 sm:flex sm:flex-wrap">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/professional/shifts">Browse shifts</Link>
           </Button>
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/professional/availability">Manage availability</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/professional/schedule">My schedule</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/professional/profile">Edit profile</Link>
           </Button>
           {isAdmin ? (
-            <Button asChild variant="outline">
+            <Button asChild className="w-full sm:w-auto" variant="outline">
               <Link href="/admin">Admin</Link>
             </Button>
           ) : null}

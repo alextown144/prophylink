@@ -162,7 +162,7 @@ export default async function MessageThreadPage({ params, searchParams }: PagePr
                   required
                 />
               </label>
-              <Button type="submit">
+              <Button className="w-full sm:w-auto" type="submit">
                 Send message
                 <Send className="h-4 w-4" />
               </Button>
@@ -251,15 +251,21 @@ function MessageBubble({ isMine, message }: { isMine: boolean; message: Message 
       <div
         className={
           isMine
-            ? "max-w-[42rem] rounded-lg bg-teal-700 p-3 text-white"
-            : "max-w-[42rem] rounded-lg border bg-white p-3 text-slate-950"
+            ? "max-w-full rounded-lg bg-teal-700 p-3 text-white sm:max-w-[42rem]"
+            : "max-w-full rounded-lg border bg-white p-3 text-slate-950 sm:max-w-[42rem]"
         }
       >
-        <p className={isMine ? "text-xs font-semibold text-teal-100" : "text-xs font-semibold text-slate-500"}>
+        <p
+          className={
+            isMine
+              ? "break-words text-xs font-semibold text-teal-100"
+              : "break-words text-xs font-semibold text-slate-500"
+          }
+        >
           {message.user_profiles?.display_name ?? message.user_profiles?.email ?? "Member"} -{" "}
           {formatMessageDate(message.created_at)}
         </p>
-        <p className="mt-2 whitespace-pre-wrap text-sm leading-6">{message.body}</p>
+        <p className="mt-2 whitespace-pre-wrap break-words text-sm leading-6">{message.body}</p>
       </div>
     </div>
   );
@@ -283,9 +289,9 @@ function StatusMessage({ status }: { status?: string }) {
 
 function IconFact({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <p className="flex items-start gap-2">
-      <span className="mt-0.5 text-teal-700">{icon}</span>
-      <span>{text}</span>
+    <p className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-teal-700">{icon}</span>
+      <span className="min-w-0 break-words">{text}</span>
     </p>
   );
 }

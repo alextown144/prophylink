@@ -135,20 +135,20 @@ function NotificationRow({ notification }: { notification: Notification }) {
             <p className="mt-2 leading-7 text-slate-600">{notification.body}</p>
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2">
+        <div className="grid shrink-0 gap-2 sm:flex sm:flex-wrap">
           {targetHref ? (
-            <Button asChild size="sm">
+            <Button asChild className="w-full sm:w-auto" size="sm">
               <Link href={targetHref}>{targetLabel}</Link>
             </Button>
           ) : null}
-          <form action={updateNotificationReadState}>
+          <form action={updateNotificationReadState} className="w-full sm:w-auto">
             <input name="notification_id" type="hidden" value={notification.id} />
             <input
               name="action"
               type="hidden"
               value={notification.read_at ? "unread" : "read"}
             />
-            <Button size="sm" type="submit" variant="outline">
+            <Button className="w-full sm:w-auto" size="sm" type="submit" variant="outline">
               {notification.read_at ? "Mark unread" : "Mark read"}
             </Button>
           </form>

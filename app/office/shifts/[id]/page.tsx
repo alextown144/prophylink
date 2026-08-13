@@ -180,7 +180,7 @@ export default async function OfficeShiftDetailPage({
           </p>
         </div>
         {canEdit ? (
-          <Button asChild>
+          <Button asChild className="w-full sm:w-auto">
             <Link href={`/office/shifts/${shift.id}/edit`}>
               <Pencil className="h-4 w-4" />
               Edit shift
@@ -471,7 +471,9 @@ function InterestedProfessionalCard({
         <form action={acceptInterestedProfessional} className="mt-4">
           <input name="booking_id" type="hidden" value={booking.id} />
           <input name="shift_id" type="hidden" value={shiftId} />
-          <Button type="submit">Accept professional</Button>
+          <Button className="w-full sm:w-auto" type="submit">
+            Accept professional
+          </Button>
         </form>
       ) : null}
       {canCancel || canComplete ? (
@@ -488,29 +490,29 @@ function InterestedProfessionalCard({
                 : "Mark the shift completed after the work day, or cancel if plans changed."}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
-            <form action={startBookingConversation}>
+          <div className="grid gap-2 sm:flex sm:flex-wrap">
+            <form action={startBookingConversation} className="w-full sm:w-auto">
               <input name="booking_id" type="hidden" value={booking.id} />
-              <Button size="sm" type="submit">
+              <Button className="w-full sm:w-auto" size="sm" type="submit">
                 Message
               </Button>
             </form>
             {canComplete ? (
-              <form action={updateBookedShiftLifecycle}>
+              <form action={updateBookedShiftLifecycle} className="w-full sm:w-auto">
                 <input name="booking_id" type="hidden" value={booking.id} />
                 <input name="shift_id" type="hidden" value={shiftId} />
                 <input name="action" type="hidden" value="complete" />
-                <Button size="sm" type="submit">
+                <Button className="w-full sm:w-auto" size="sm" type="submit">
                   Mark completed
                 </Button>
               </form>
             ) : null}
             {canCancel ? (
-              <form action={updateBookedShiftLifecycle}>
+              <form action={updateBookedShiftLifecycle} className="w-full sm:w-auto">
                 <input name="booking_id" type="hidden" value={booking.id} />
                 <input name="shift_id" type="hidden" value={shiftId} />
                 <input name="action" type="hidden" value="cancel" />
-                <Button size="sm" type="submit" variant="outline">
+                <Button className="w-full sm:w-auto" size="sm" type="submit" variant="outline">
                   Cancel shift
                 </Button>
               </form>
@@ -631,7 +633,9 @@ function AvailableProfessionalCard({
         <form action={selectAvailableProfessional} className="mt-4">
           <input name="professional_profile_id" type="hidden" value={professional.id} />
           <input name="shift_id" type="hidden" value={shiftId} />
-          <Button type="submit">Select professional</Button>
+          <Button className="w-full sm:w-auto" type="submit">
+            Select professional
+          </Button>
         </form>
       ) : null}
     </div>
@@ -679,9 +683,9 @@ function StatusMessage({
 
 function IconFact({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <p className="flex items-start gap-2">
-      <span className="mt-0.5 text-teal-700">{icon}</span>
-      <span>{text}</span>
+    <p className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-teal-700">{icon}</span>
+      <span className="min-w-0 break-words">{text}</span>
     </p>
   );
 }

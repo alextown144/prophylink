@@ -96,13 +96,13 @@ export function DashboardMenu() {
   }
 
   return (
-    <details className="group relative">
-      <summary className="focus-ring flex h-10 cursor-pointer list-none items-center gap-2 rounded-lg bg-[#00B3A4] px-4 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#008F85] [&::-webkit-details-marker]:hidden">
+    <details className="group relative shrink-0">
+      <summary className="focus-ring flex h-11 cursor-pointer list-none items-center gap-2 rounded-lg bg-[#00B3A4] px-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#008F85] sm:h-10 sm:px-4 [&::-webkit-details-marker]:hidden">
         <LayoutDashboard className="h-4 w-4" />
         Dashboard
         <ChevronDown className="h-4 w-4 transition-transform group-open:rotate-180" />
       </summary>
-      <div className="absolute right-0 top-12 z-50 flex max-h-[calc(100dvh-6rem)] w-[calc(100vw-2rem)] max-w-72 flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-brand">
+      <div className="fixed inset-x-4 top-24 z-50 flex max-h-[calc(100dvh-7rem)] flex-col overflow-hidden rounded-lg border border-slate-200 bg-white shadow-brand sm:absolute sm:inset-x-auto sm:right-0 sm:top-12 sm:w-[calc(100vw-2rem)] sm:max-w-72">
         <div className="shrink-0 border-b bg-slate-50 px-4 py-3">
           <p className="text-xs font-semibold uppercase text-slate-500">Signed in</p>
           <p className="mt-1 truncate text-sm font-semibold text-slate-950">{email}</p>

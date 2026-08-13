@@ -132,11 +132,11 @@ export default async function AdminMarketplacePage() {
             notifications are flowing.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild variant="outline">
+        <div className="grid gap-3 sm:flex sm:flex-wrap">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/admin/credentials">Credential review</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/admin/users">Users</Link>
           </Button>
         </div>
@@ -409,7 +409,7 @@ function ShiftCard({
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         <Badge variant="secondary">{bookings.length} responses</Badge>
-        <Button asChild size="sm" variant="outline">
+        <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
           <Link href={`/office/shifts/${shift.id}`}>Open detail</Link>
         </Button>
       </div>
@@ -476,8 +476,8 @@ function ConversationCard({
   return (
     <div className="rounded-lg border bg-white p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <p className="font-semibold text-slate-950">
+        <div className="min-w-0">
+          <p className="break-words font-semibold text-slate-950">
             Conversation {conversation.id.slice(0, 8)}
           </p>
           <p className="mt-1 text-sm text-slate-600">
@@ -491,7 +491,9 @@ function ConversationCard({
           <p className="font-semibold text-slate-950">
             {sender?.display_name ?? sender?.email ?? "Sender"}
           </p>
-          <p className="mt-1 line-clamp-2 leading-6 text-slate-600">{latestMessage.body}</p>
+          <p className="mt-1 line-clamp-2 break-words leading-6 text-slate-600">
+            {latestMessage.body}
+          </p>
         </div>
       ) : (
         <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm text-slate-600">
@@ -564,9 +566,9 @@ function EmptyState({ text }: { text: string }) {
 
 function IconFact({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <p className="flex items-start gap-2">
-      <span className="mt-0.5 text-teal-700">{icon}</span>
-      <span>{text}</span>
+    <p className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-teal-700">{icon}</span>
+      <span className="min-w-0 break-words">{text}</span>
     </p>
   );
 }

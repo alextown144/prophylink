@@ -72,7 +72,7 @@ export default async function MessagesPage({ searchParams }: { searchParams: Sea
             Coordinate shift details after an office selects a professional.
           </p>
         </div>
-        <Button asChild variant="outline">
+        <Button asChild className="w-full sm:w-auto" variant="outline">
           <Link href="/notifications">Notifications</Link>
         </Button>
       </div>
@@ -191,7 +191,7 @@ function ConversationCard({
       href={`/messages/${conversation.id}`}
     >
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
-        <div>
+        <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant={booking?.status === "confirmed" ? "default" : "outline"}>
               {booking?.status ? formatStatus(booking.status) : "Conversation"}
@@ -204,7 +204,9 @@ function ConversationCard({
             {booking?.organizations?.name ?? "Booking conversation"}
           </h2>
           <p className="mt-1 text-sm text-slate-600">
-            {booking ? formatShiftWindow(booking.agreed_starts_at, booking.agreed_ends_at) : "Shift details unavailable"}
+            {booking
+              ? formatShiftWindow(booking.agreed_starts_at, booking.agreed_ends_at)
+              : "Shift details unavailable"}
           </p>
           <p className="mt-1 text-sm font-semibold text-teal-700">
             {booking?.professional_profiles?.user_profiles?.display_name ??
@@ -213,9 +215,9 @@ function ConversationCard({
               "Professional"}
           </p>
         </div>
-        <MessageSquareText className="h-5 w-5 text-teal-700" />
+        <MessageSquareText className="h-5 w-5 shrink-0 text-teal-700" />
       </div>
-      <p className="mt-3 line-clamp-2 text-sm leading-6 text-slate-600">
+      <p className="mt-3 line-clamp-2 break-words text-sm leading-6 text-slate-600">
         {latestMessage?.body ?? "No messages yet."}
       </p>
     </Link>

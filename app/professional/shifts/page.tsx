@@ -107,14 +107,14 @@ export default async function ProfessionalShiftsPage({
             schedule.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild>
+        <div className="grid gap-3 sm:flex sm:flex-wrap">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/professional/availability">Manage availability</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/professional/schedule">My schedule</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/professional/dashboard">Dashboard</Link>
           </Button>
         </div>
@@ -278,31 +278,31 @@ function ResponseRow({ booking }: { booking: BookingInterest }) {
         {getBookingNextAction(booking.status, "professional")}
       </p>
       {booking.shift_id && (booking.status === "accepted" || canMessage) ? (
-        <div className="mt-3 flex flex-wrap gap-2">
+        <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap">
           {booking.status === "accepted" ? (
             <>
-              <form action={respondToAcceptedShift}>
+              <form action={respondToAcceptedShift} className="w-full sm:w-auto">
                 <input name="booking_id" type="hidden" value={booking.id} />
                 <input name="shift_id" type="hidden" value={booking.shift_id} />
                 <input name="action" type="hidden" value="confirm" />
-                <Button size="sm" type="submit">
+                <Button className="w-full sm:w-auto" size="sm" type="submit">
                   Confirm shift
                 </Button>
               </form>
-              <form action={respondToAcceptedShift}>
+              <form action={respondToAcceptedShift} className="w-full sm:w-auto">
                 <input name="booking_id" type="hidden" value={booking.id} />
                 <input name="shift_id" type="hidden" value={booking.shift_id} />
                 <input name="action" type="hidden" value="decline" />
-                <Button size="sm" type="submit" variant="outline">
+                <Button className="w-full sm:w-auto" size="sm" type="submit" variant="outline">
                   Decline
                 </Button>
               </form>
             </>
           ) : null}
           {canMessage ? (
-            <form action={startBookingConversation}>
+            <form action={startBookingConversation} className="w-full sm:w-auto">
               <input name="booking_id" type="hidden" value={booking.id} />
-              <Button size="sm" type="submit" variant="outline">
+              <Button className="w-full sm:w-auto" size="sm" type="submit" variant="outline">
                 Message office
               </Button>
             </form>
@@ -327,8 +327,8 @@ function ShiftCard({
   return (
     <Card>
       <CardContent className="p-5">
-        <div className="grid gap-5 lg:grid-cols-[1fr_14rem]">
-          <div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_14rem]">
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               {isRoleMatch ? <Badge>Role match</Badge> : null}
               <Badge variant="secondary">{shift.professional_roles?.name ?? "Shift"}</Badge>
@@ -454,9 +454,9 @@ function ResponseMessage({ status }: { status: string }) {
 
 function IconFact({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <p className="flex items-start gap-2">
-      <span className="mt-0.5 text-teal-700">{icon}</span>
-      <span>{text}</span>
+    <p className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-teal-700">{icon}</span>
+      <span className="min-w-0 break-words">{text}</span>
     </p>
   );
 }

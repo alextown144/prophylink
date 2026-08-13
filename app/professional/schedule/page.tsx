@@ -78,14 +78,14 @@ export default async function ProfessionalSchedulePage() {
             you do not get double-booked.
           </p>
         </div>
-        <div className="flex flex-wrap gap-3">
-          <Button asChild>
+        <div className="grid gap-3 sm:flex sm:flex-wrap">
+          <Button asChild className="w-full sm:w-auto">
             <Link href="/professional/shifts">Browse shifts</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/messages">Messages</Link>
           </Button>
-          <Button asChild variant="outline">
+          <Button asChild className="w-full sm:w-auto" variant="outline">
             <Link href="/professional/availability">Availability</Link>
           </Button>
         </div>
@@ -200,14 +200,14 @@ function ScheduleBookingCard({
             {booking.organizations?.name ?? "Dental office"}
           </h2>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild size="sm" variant="outline">
+        <div className="grid gap-2 sm:flex sm:flex-wrap">
+          <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
             <Link href="/professional/shifts">Review</Link>
           </Button>
           {canMessage ? (
-            <form action={startBookingConversation}>
+            <form action={startBookingConversation} className="w-full sm:w-auto">
               <input name="booking_id" type="hidden" value={booking.id} />
-              <Button size="sm" type="submit">
+              <Button className="w-full sm:w-auto" size="sm" type="submit">
                 Message
               </Button>
             </form>
@@ -249,9 +249,9 @@ function EmptyState({ text, title }: { text: string; title: string }) {
 
 function IconFact({ icon, text }: { icon: React.ReactNode; text: string }) {
   return (
-    <p className="flex items-start gap-2">
-      <span className="mt-0.5 text-teal-700">{icon}</span>
-      <span>{text}</span>
+    <p className="flex min-w-0 items-start gap-2">
+      <span className="mt-0.5 shrink-0 text-teal-700">{icon}</span>
+      <span className="min-w-0 break-words">{text}</span>
     </p>
   );
 }
