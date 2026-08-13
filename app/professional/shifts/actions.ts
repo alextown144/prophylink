@@ -55,6 +55,13 @@ function formString(formData: FormData, key: string) {
   return typeof value === "string" ? value.trim() : "";
 }
 
+function professionalShiftHref(shiftId: string, params?: Record<string, string>) {
+  const searchParams = new URLSearchParams(params);
+  const query = searchParams.toString();
+
+  return `/professional/shifts/${shiftId}${query ? `?${query}` : ""}`;
+}
+
 export async function expressInterestInShift(formData: FormData) {
   const user = await requireUser();
   const parsed = shiftInterestSchema.safeParse({
@@ -66,7 +73,7 @@ export async function expressInterestInShift(formData: FormData) {
   }
 
   if (!isSupabaseServiceRoleConfigured()) {
-    redirect("/professional/shifts?interest=service_required");
+    redirect(professionalShiftHref(parsed.data.shiftId, { interest: "service_required" }));
   }
 
   const supabase = await createSupabaseServerClient();
@@ -79,7 +86,7 @@ export async function expressInterestInShift(formData: FormData) {
   const professionalProfileRef = professionalProfile as ProfessionalProfileRef | null;
 
   if (!professionalProfileRef) {
-    redirect("/professional/shifts?interest=profile_required");
+    redirect(professionalShiftHref(parsed.data.shiftId, { interest: "profile_required" }));
   }
 
   const { data: shiftData } = await supabase
@@ -92,7 +99,7 @@ export async function expressInterestInShift(formData: FormData) {
   const shift = shiftData as ShiftRef | null;
 
   if (!shift) {
-    redirect("/professional/shifts?interest=unavailable");
+    redirect(professionalShiftHref(parsed.data.shiftId, { interest: "unavailable" }));
   }
 
   const admin = createSupabaseAdminClient();
@@ -103,7 +110,7 @@ export async function expressInterestInShift(formData: FormData) {
   );
 
   if (!canExpressInterest) {
-    redirect("/professional/shifts?interest=plan_required");
+    redirect(professionalShiftHref(shift.id, { interest: "plan_required" }));
   }
 
   const hasConflict = await professionalHasBlockingConflict(admin, {
@@ -113,7 +120,7 @@ export async function expressInterestInShift(formData: FormData) {
   });
 
   if (hasConflict) {
-    redirect("/professional/shifts?interest=conflict");
+    redirect(professionalShiftHref(shift.id, { interest: "conflict" }));
   }
 
   const { data: existingBooking } = await admin
@@ -125,7 +132,7 @@ export async function expressInterestInShift(formData: FormData) {
     .maybeSingle();
 
   if (existingBooking) {
-    redirect("/professional/shifts?interest=already_sent");
+    redirect(professionalShiftHref(shift.id, { interest: "already_sent" }));
   }
 
   const bookingPayload: BookingInsert = {
@@ -146,7 +153,7 @@ export async function expressInterestInShift(formData: FormData) {
     .single();
 
   if (error || !booking) {
-    redirect("/professional/shifts?interest=failed");
+    redirect(professionalShiftHref(shift.id, { interest: "failed" }));
   }
 
   const eventPayload: BookingEventInsert = {
@@ -167,11 +174,13 @@ export async function expressInterestInShift(formData: FormData) {
   ]);
 
   revalidatePath("/professional/shifts");
+  revalidatePath(`/professional/shifts/${shift.id}`);
   revalidatePath("/professional/dashboard");
+  revalidatePath("/professional/schedule");
   revalidatePath("/notifications");
   revalidatePath("/office/dashboard");
   revalidatePath(`/office/shifts/${shift.id}`);
-  redirect("/professional/shifts?interest=sent");
+  redirect(professionalShiftHref(shift.id, { interest: "sent" }));
 }
 
 export async function respondToAcceptedShift(formData: FormData) {
@@ -187,7 +196,7 @@ export async function respondToAcceptedShift(formData: FormData) {
   }
 
   if (!isSupabaseServiceRoleConfigured()) {
-    redirect("/professional/shifts?response=service_required");
+    redirect(professionalShiftHref(parsed.data.shiftId, { response: "service_required" }));
   }
 
   const supabase = await createSupabaseServerClient();
@@ -200,7 +209,7 @@ export async function respondToAcceptedShift(formData: FormData) {
   const professionalProfileRef = professionalProfile as ProfessionalProfileRef | null;
 
   if (!professionalProfileRef) {
-    redirect("/professional/shifts?response=profile_required");
+    redirect(professionalShiftHref(parsed.data.shiftId, { response: "profile_required" }));
   }
 
   const { data: bookingData } = await supabase
@@ -214,7 +223,7 @@ export async function respondToAcceptedShift(formData: FormData) {
   const booking = bookingData as BookingRef | null;
 
   if (!booking || booking.status !== "accepted") {
-    redirect("/professional/shifts?response=unavailable");
+    redirect(professionalShiftHref(parsed.data.shiftId, { response: "unavailable" }));
   }
 
   const admin = createSupabaseAdminClient();
@@ -230,7 +239,7 @@ export async function respondToAcceptedShift(formData: FormData) {
     : false;
 
   if (hasConflict) {
-    redirect("/professional/shifts?response=conflict");
+    redirect(professionalShiftHref(parsed.data.shiftId, { response: "conflict" }));
   }
 
   const { error } = await admin
@@ -243,7 +252,7 @@ export async function respondToAcceptedShift(formData: FormData) {
     .eq("id", booking.id);
 
   if (error) {
-    redirect("/professional/shifts?response=failed");
+    redirect(professionalShiftHref(parsed.data.shiftId, { response: "failed" }));
   }
 
   await admin
@@ -274,11 +283,17 @@ export async function respondToAcceptedShift(formData: FormData) {
   ]);
 
   revalidatePath("/professional/shifts");
+  revalidatePath(`/professional/shifts/${parsed.data.shiftId}`);
   revalidatePath("/professional/dashboard");
+  revalidatePath("/professional/schedule");
   revalidatePath("/notifications");
   revalidatePath("/office/dashboard");
   revalidatePath(`/office/shifts/${parsed.data.shiftId}`);
-  redirect(`/professional/shifts?response=${confirms ? "confirmed" : "declined"}`);
+  redirect(
+    professionalShiftHref(parsed.data.shiftId, {
+      response: confirms ? "confirmed" : "declined"
+    })
+  );
 }
 
 async function professionalHasBlockingConflict(

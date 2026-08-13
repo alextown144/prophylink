@@ -277,6 +277,11 @@ function ResponseRow({ booking }: { booking: BookingInterest }) {
       <p className="mt-3 rounded-lg bg-slate-50 p-3 text-sm leading-6 text-slate-600">
         {getBookingNextAction(booking.status, "professional")}
       </p>
+      {booking.shift_id ? (
+        <Button asChild className="mt-3" size="sm" variant="outline">
+          <Link href={`/professional/shifts/${booking.shift_id}`}>Review details</Link>
+        </Button>
+      ) : null}
       {booking.shift_id && (booking.status === "accepted" || canMessage) ? (
         <div className="mt-3 grid gap-2 sm:flex sm:flex-wrap">
           {booking.status === "accepted" ? (
@@ -366,6 +371,9 @@ function ShiftCard({
             </div>
           </div>
           <div className="grid content-start gap-4">
+            <Button asChild className="w-full" variant="outline">
+              <Link href={`/professional/shifts/${shift.id}`}>Review details</Link>
+            </Button>
             {shift.unpaid_lunch_minutes ? (
               <div className="rounded-lg bg-slate-50 p-4">
                 <p className="text-sm font-semibold text-slate-500">Lunch</p>

@@ -15,6 +15,7 @@ import {
   parseWeeklyRecurrenceDays
 } from "@/lib/availability";
 import { requireUser } from "@/lib/auth/session";
+import type { Json } from "@/lib/supabase/database.types";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -63,6 +64,7 @@ type ProfessionalRole = {
 
 type BookingSummary = {
   id: string;
+  shift_id: string | null;
   agreed_ends_at: string;
   agreed_hourly_rate_cents: number | null;
   agreed_starts_at: string;
@@ -84,6 +86,7 @@ type NotificationPreview = {
   title: string;
   body: string | null;
   created_at: string;
+  metadata: Json;
   read_at: string | null;
 };
 
@@ -402,7 +405,7 @@ async function getProfessionalDashboardData(userId: string) {
         .maybeSingle(),
       supabase
         .from("notifications")
-        .select("id, type, title, body, created_at, read_at")
+        .select("id, type, title, body, created_at, read_at, metadata")
         .eq("user_id", userId)
         .order("created_at", { ascending: false })
         .limit(6)
@@ -435,7 +438,7 @@ async function getProfessionalDashboardData(userId: string) {
         .limit(6),
       supabase
         .from("bookings")
-        .select("id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at")
+        .select("id, shift_id, status, agreed_hourly_rate_cents, agreed_starts_at, agreed_ends_at")
         .eq("professional_profile_id", professionalProfile.id)
         .order("created_at", { ascending: false })
         .limit(6),
@@ -480,7 +483,9 @@ function BookingPreview({ booking }: { booking: BookingSummary }) {
       </p>
       {booking.status === "accepted" ? (
         <Button asChild className="mt-4" size="sm">
-          <Link href="/professional/shifts">Confirm or decline</Link>
+          <Link href={booking.shift_id ? `/professional/shifts/${booking.shift_id}` : "/professional/shifts"}>
+            Confirm or decline
+          </Link>
         </Button>
       ) : null}
     </div>
@@ -534,11 +539,25 @@ function NotificationCard({ notification }: { notification: NotificationPreview 
         "shift_completed"
       ].includes(notification.type) ? (
         <Button asChild className="mt-4" size="sm">
-          <Link href="/professional/shifts">Review shift</Link>
+          <Link href={getNotificationShiftHref(notification)}>Review shift</Link>
         </Button>
       ) : null}
     </div>
   );
+}
+
+function getNotificationShiftHref(notification: NotificationPreview) {
+  if (
+    !notification.metadata ||
+    typeof notification.metadata !== "object" ||
+    Array.isArray(notification.metadata)
+  ) {
+    return "/professional/shifts";
+  }
+
+  const shiftId = notification.metadata.shift_id;
+
+  return typeof shiftId === "string" ? `/professional/shifts/${shiftId}` : "/professional/shifts";
 }
 
 function StatusMetric({

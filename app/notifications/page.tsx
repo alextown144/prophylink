@@ -202,7 +202,7 @@ function getNotificationTargetHref(notification: Notification) {
       "shift_completed"
     ].includes(notification.type)
   ) {
-    return "/professional/shifts";
+    return shiftId ? `/professional/shifts/${shiftId}` : "/professional/shifts";
   }
 
   return null;

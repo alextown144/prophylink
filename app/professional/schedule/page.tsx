@@ -275,7 +275,9 @@ function ScheduleBookingCard({
         </div>
         <div className="grid gap-2 sm:flex sm:flex-wrap">
           <Button asChild className="w-full sm:w-auto" size="sm" variant="outline">
-            <Link href="/professional/shifts">Review</Link>
+            <Link href={booking.shift_id ? `/professional/shifts/${booking.shift_id}` : "/professional/shifts"}>
+              Review
+            </Link>
           </Button>
           {canMessage ? (
             <form action={startBookingConversation} className="w-full sm:w-auto">
